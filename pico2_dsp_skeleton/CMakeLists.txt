@@ -21,7 +21,7 @@ add_executable(pico2_dsp_skeleton
 pico_generate_pio_header(pico2_dsp_skeleton ${CMAKE_CURRENT_LIST_DIR}/i2s.pio)
 
 set(CMSISCORE ${PICO_SDK_PATH}/src/rp2_common/cmsis/stub/CMSIS/Core CACHE PATH "CMSIS Core Include Path")
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../CMSIS-DSP CMSIS-DSP)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../CMSIS-DSP CMSIS-DSP)
 
 target_link_libraries(pico2_dsp_skeleton
     pico_stdlib
