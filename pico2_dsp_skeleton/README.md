@@ -4,6 +4,8 @@ This program is a real-time Audio DSP framework built using the RP2350
 (Raspberry Pi Pico 2). It uses PIO to implement 4-wire (send and
 receive) i2s.  PIO also implements all needed clocks using side sets.
 
+It is presented in YouTube video: xxxxxxx
+
 A PCM1808 i2s ADC provides input data and a PCM5102A i2s DAC converts
 samples back to analog for output.
 
@@ -66,7 +68,7 @@ This will produce pico2_dsp_skeleton.uf2, the file you load onto the Pico2
 using BOOTSEL via pressing the button while powering on (see Pico docs) or
 using picotool,
 
-  pictotool load -f pico2_dsp_skeleton.uf2 -x
+  picotool load -f pico2_dsp_skeleton.uf2 -x
 
 ## Generating Custom FIR Coefficients
 
