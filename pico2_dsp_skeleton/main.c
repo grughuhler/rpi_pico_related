@@ -143,19 +143,18 @@ void make_sine(int32_t *buf, double hz)
   }
 }
 
-/* This function sets the output of the right channel to be
+/* This function sets the output of the left channel to be
  * the product of the signals from the left and right channels.
  * You can see a frequency shift
  */
 
-void __attribute__ ((noinline)) process_buffer(int32_t *buf)
+void __attribute__ ((noinline)) process_buffer_mult(int32_t *buf)
 {
   for (int i = 0; i < SAMPLES_PER_BUFFER; i += 2) {
     float sample1 = ((float) buf[i])/2147483648.0;
     float sample2 = ((float) buf[i+1])/2147483648.0;
 
-    buf[i+1] = sample2*sample1*4000000000.0;
-    buf[i] = sample1*2000000000.0;
+    buf[i] = sample2*sample1*4000000000.0;
   }
 }
 
@@ -334,12 +333,10 @@ int main()
          * samples will be passed through unchanged.  You have the
          * time of one DMA (approx 1.3ms) to process the buffer.
          */
-#if 1        
         process_buffer_fir(buf);
-#else
-        make_sine(buf, 291);
-#endif
-
+        //make_sine(buf, 290);
+        //process_buffer_mult(buf);
+        
         gpio_xor_mask(1u << PIN_DEBUG_SW); // Toggle SW GPIO
       }
     }

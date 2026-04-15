@@ -3,13 +3,6 @@
 
 #include "arm_math.h"
 
-// Generated FIR Filter Coefficients
-// Sample Rate: 48828.125 Hz
-// Passband: 2000.0 Hz
-// Stopband: 2800.0 Hz
-// Number of Taps (N): 115
-// Target Attenuation: 35.0 dB
-
 #define NUM_TAPS 115
 
 const float32_t fir_coeffs[NUM_TAPS] = {
