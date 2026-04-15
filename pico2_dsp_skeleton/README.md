@@ -87,8 +87,8 @@ a better filter from tfilter.
 **Options:**
 
     --pass_hz : The ceiling passband frequency where the filter begins
-  rolling off (default `5000`). To lower the cutoff frequency,
-  decrease this value.
+      rolling off (default `5000`). To lower the cutoff frequency,
+      decrease this value.
 
     --stop_hz : The frequency floor where the stopband attenuation
       requirement must be strictly met (default `7000`). Notice that
