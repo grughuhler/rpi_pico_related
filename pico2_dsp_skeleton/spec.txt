@@ -1,0 +1,107 @@
+=== This is the original spec file I told antigravity to process.
+=== I interacted with it quite a bit after its initial work so this
+=== spec was not complete enough to allow it to completely autonomously
+=== create the software.
+
+This file contains a specification for a program that you are to write
+and compile.
+
+The purpose of the program is to act as a DSP software development
+framework for audio signals.  A PCM1808 ADC feeds audio data to
+software.  Software processes the audio data.  The processed data
+is then feed to a PCM5102A DAC for output.
+
+Requirement: The program will target the Raspberry Pi Pico 2 and will
+use both a core and the PIO engine.
+
+Requirement: Put the program source in the same directory as this
+specification file.
+
+Requirement: The program will be implemented using the Pico C SDK.
+You will find it installed in ../pico-sdk.
+
+Requirement: Data flow will be from a PCM1808 ADC for input, to the
+Pico 2 core for processing, and then to a PCM5102A DAC for output.
+
+Requirement: The i2s protocal will be used for both the PCM1808 and
+the PCM5102A.  Both will act as slaves meaning they input the bit
+clock and the LR clock.  They will both use the same instance of these
+clocks meaning the same bit clock and LR clock signals will be
+connected to the PCM1808 and the PCM5102A.
+
+Requirement: The PCM1808 also requires a system clock (SCK).  Its
+frequency shall be 12.5 MHz.  The PICO 2 clock shall be set to 150
+MHz.  SCK will produced by the Pico 2 PIO.  The value of 12.5 MHz
+implies that the program will use a non-standard audio sampling rate
+of 48828.125 samples per second.  It will use 32 bit audio.  This
+implies that the i2s bit clock (BCK) will be 3.125 MHz.  Of course,
+the i2s LRCK frequency will match the sample rate.  The audio is
+stereo.  Double check these frequencies and tell me if you see any
+problems with them.
+
+Requirement: The pico 2 will generate the following clocks using side
+sets in the PIO program: the system clock (SCK) for the PCM1808, the
+i2s bit clock (BCK), and the i2s LR clock (LRCK).
+
+Requirement: Pin connectivity is as follows.  The i2s BCK and LRCK
+will connect from the Pico 2 to both the PCM1808 and the PCM5102A.
+SCK will connect only to the PCM1808.  SCK on the PCM5102A will be
+grounded.  There will be a DIN signal, an input to the Pico 2 from the
+ADC.  There will be a DOUT signal, an output from the Pico 2 to the
+DAC.
+
+Requirement: A single PIO program using one engine will implement the
+i2s protocol for both the PCM1808 and the PCM5102A.  You will write this
+program.
+
+Requirement: The audio processing will use three buffers 0, 1, and 2
+in a cyclic fashion.  One buffer will be receiving data from the ADC.
+The next will be being processed by software on the Pico 2.  The last
+will be sending data to the DAC.
+
+Requirement: I/O for the DAC and the ADC will be done via chained
+DMAs.  This implies that, once started, no action from software is
+needed to start the DMA for the next buffer.
+
+Requirement: A DMA completion completion interrupt associated with the
+ADC will be used to signal to software that it is time for it start
+processing the next buffer.  This DMA writes to the next buffer that
+software will process.
+
+Requirement: Theinterrupt handler will set a buffer index that tells
+software which buffer to process.  A change in this value tells
+software to begin processing a buffer.  No audio processing will be
+done inside an interrupt handler.
+
+Requirement: The program must avoid phase offset in the DMAs.  One idea
+is to slave the output DMA to the input DMA's pace by using a the receiving
+DREQ for both the receiving and sending DMA.  Think this through before
+implementing and tell me if you see a problem with it.  Think carefully
+about the impact of the FIFOs between the DMAs and the PIO.  Think carefully
+about how DMA start up works.  Will there be a need for some manual data
+pushes to the PIO to prime the system?  If so, use audio value 0.
+
+Requirement: Start the DMAs at the same moment using a dma_start_mask.
+
+Requirement: Assume the software will use floating point to process
+audio samples.  The test framework must show the most efficient
+possible conversion to and from floating point of audio samples.
+
+Requirement: When the Pico 2 program first starts, it must flash the
+Pico 2 board's LED on for 1/4 second, off for 1/4 second, on for 1/4
+second and finally off for 1/4 second.  This is to show that the
+program starts OK. Then initialize all buffers to the audio zero
+value.  Finally, DMAs can be started and the cyclic processing can
+begin.
+
+Requirement: software will first process buffer 0.  This implies that
+the first DMA from the ADC will write to buffer 1 and the first DMA to
+the DAC will read from buffer 2.
+
+Requirement: The i2s PIO program must be custom.  Do no directly use a
+library.
+
+Requirement: Let buffers be 128 audio samples long, meaning 64 left
+samples and 64 right samples.  But make this value be a parameter that
+is easy to change.  I think it must be greater than PIO FIFO lengths
+to help keep DMAs in lock-step.
