@@ -34,6 +34,7 @@ Both the PCM5102A and the PCM1808 are configured by pins tied low or high.
     Power: Needs both 3.3 and 5V.
 
 ### Pinout
+
 Look at main.c
 
 Pin numbers can be set in the hardware macros inside main.c. However,
@@ -51,7 +52,8 @@ Install the PICO C SDK according to its instructions.  You can see
 install_pico_sdk.txt for a summary of what I did, a manual install
 without an IDE.
 
-For this program:
+### For this program:
+
     make a directory someplace and cd to it
     git clone https://github.com/ARM-software/CMSIS-DSP.git
     git clone https://github.com/grughuhler/rpi_pico_related.git
