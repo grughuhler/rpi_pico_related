@@ -1,21 +1,21 @@
 # Pico 2 I2S Audio DSP Framework
 
-A real-time Audio DSP framework built using the RP2350 (Raspberry Pi
-Pico 2). It uses PIO to implement 4-wire (send + receive) i2s.  PIO
-also implements all needed clocks using side sets.
+This program is a real-time Audio DSP framework built using the RP2350
+(Raspberry Pi Pico 2). It uses PIO to implement 4-wire (send and
+receive) i2s.  PIO also implements all needed clocks using side sets.
 
-An PCM1808 i2s ADC provides input data and a PCM5102A i2s DAC converts
+A PCM1808 i2s ADC provides input data and a PCM5102A i2s DAC converts
 samples back to analog for output.
 
 A cyclic triple buffer DMA is used.  While software processes one buffer,
 the ADC DMA is filling the next and the DAC DMA is sending the previous.
-Software processing is in-place.
+Software sample processing is in-place.
 
 ## Hardware Setup
 The PIO heavily utilizes side-set instruction mappings. Therefore
-`SCK`, `BCK`, and `LRCK` require contiguous sequential GPIO pin numbers.
+SCK, BCK, and LRCK require contiguous sequential GPIO pin numbers.
 
-### Device Settings
+### Hardware Device Settings
 Both the PCM5102A and the PCM1808 are configured by pins tied low or high.
 #### PCM5102A
 FLT: GND (normal latency filter)
@@ -39,36 +39,64 @@ clocks 10, 11, and 12 must strictly remain sequential.
 
 ## Software Pipeline Execution Details
 
-* Generates all clock schedules explicitly using simple integer dividers from a 150MHz core clock to yield an exactly 48828.125 Hz sample stereo rate without jitter. 
-* Operates on a 3-buffer loop (`128 int32 Samples x 3 Buffers`).
-* Uses 4 dedicated hardware ping-pong DMA channels rotating between the cyclic sequence utilizing native PIO DREQ signals, requiring minimal software logic to chain to the immediate next buffer limit. 
-* Converts all raw buffered frames from I2S Native `int32_t` 2's-complement strings to `float` variables, exploiting the RP2350 Cortex-M33 hardware Floating Point Unit capacity.
+PIO generates all clock schedules explicitly using simple integer
+dividers from a 150MHz core clock to yield an exactly 48828.125 Hz
+sample stereo rate without jitter.  Yes, that's a weird sample rate.
 
-## Compiling Requirements
-This project uses standard CMake methodology against the Pico SDK environment. You MUST ensure your Raspberry Pi `pico-sdk` (containing full RP2350 headers) is located correctly matching the standard `PICO_SDK_PATH` environment logic. 
+## Building
 
-**Steps to Compile:**
-```bash
-mkdir build
-cd build
-cmake ..
-make -j4
-```
-A compiled `pico2_dsp_skeleton.uf2` binary will be successfully generated in the build directory. Follow traditional BOOTSEL upload to run exactly on the Pico hardware.
-> _Note: Serial `printf` diagnostic tracking natively routes exclusively over the standard USB Data cable instead of traditional Hardware UART pins via CMake configurations intended for testing._
+Install the PICO C SDK according to its instructions.  You can see
+install_pico_sdk.txt for a summary of what I did, a manual install
+without an IDE.
+
+For this program:
+  make a directory someplace and cd to it
+  git clone https://github.com/ARM-software/CMSIS-DSP.git
+  git clone https://github.com/grughuhler/rpi_pico_related.git
+  cd rpi_pico_related/pico2_dsp_skeleton
+  # Be sure PICO_SDK_PATH is set to directory of pico-sdk
+  mkdir build
+  cd build
+  cmake ..
+  make
+
+Note: build failed on Fedora 43 with a compiler internal error (by
+definition a bug in the compiler).  Tested OK on Ubuntu 24.04 LTS.
+This will produce pico2_dsp_skeleton.uf2, the file you load onto the Pico2
+using BOOTSEL via pressing the button while powering on (see Pico docs) or
+using picotool,
+
+  pictotool load -f pico2_dsp_skeleton.uf2 -x
 
 ## Generating Custom FIR Coefficients
-A pure Python CLI script is included to let you easily design new Low-Pass FIR filters with varying cutoffs or sharpness constraints directly into the embedded C header.
+
+A pure Python CLI script is included to let you easily design new
+Low-Pass FIR filters with varying cutoffs or sharpness constraints
+directly into the embedded C header.  Alternatively, you can use an
+online tool such as tfilter to generate coefficients.  You might get
+a better filter from tfilter.
 
 **To run the script:**
-```bash
-python3 generate_fir.py --pass_hz 5000 --stop_hz 7000 --attenuation 35
-```
+
+  python3 generate_fir.py --pass_hz 2000 --stop_hz 2500 --attenuation 35
 
 **Options:**
-- `--pass_hz` : The ceiling passband frequency where the filter begins rolling off (default `5000`). To lower the cutoff frequency, decrease this value.
-- `--stop_hz` : The frequency floor where the stopband attenuation requirement must be strictly met (default `7000`). Notice that setting this closer to the `--pass_hz` drastically increases "sharpness" but safely requires significantly more mathematical filter taps to execute.
-- `--attenuation` : The required dampening coefficient in decibels targeted in the stopband (default `35` dB). Increasing this prevents more audio bleed-through but fundamentally creates a larger tap array load.
-- `--fs` : Base sample frequency rate natively configuring math timing (default `48828.125`).
 
-Once generated, entirely rebuild the application with make so the newly injected header array compiles into the ELF application.
+--pass_hz : The ceiling passband frequency where the filter begins
+  rolling off (default `5000`). To lower the cutoff frequency,
+  decrease this value.
+
+--stop_hz : The frequency floor where the stopband attenuation
+  requirement must be strictly met (default `7000`). Notice that
+  setting this closer to the `--pass_hz` drastically increases
+  "sharpness" but requires more filter taps.
+
+--attenuation : The required dampening coefficient in decibels
+  targeted in the stopband (default 35 dB). Increasing this prevents
+  more audio bleed-through but requires more coefficients.
+
+--fs : Base sample frequency rate natively configuring math timing
+  (default `48828.125`).
+
+Once generated, rebuild the application with make so the newly created
+header array compiles into the ELF application.
