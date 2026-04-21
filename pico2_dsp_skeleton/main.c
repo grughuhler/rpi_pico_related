@@ -72,7 +72,7 @@ volatile int process_index = -1;
  */
 
 /****************** Select buffer processing **********************/
-#define USE_IIR
+#define USE_FIR
 
 #if defined(USE_FIR)
 
@@ -161,7 +161,7 @@ void make_sine(int32_t *buf, double hz)
   float phase_increment = 2.0f * PI_F * hz / SAMPLE_RATE;
 
   for (int i = 0; i < SAMPLES_PER_BUFFER; i += 2) {
-    float sample = sinf(phase) * MAX_INT_F/2;
+    float sample = arm_sin_f32(phase) * (MAX_INT_F / 2.0f);
     buf[i] = (int32_t)sample;       // Left channel
     buf[i+1] = (int32_t)sample;     // Right channel
     phase += phase_increment;
@@ -179,10 +179,10 @@ void make_sine(int32_t *buf, double hz)
 void __attribute__ ((noinline)) do_mult(int32_t *buf)
 {
   for (int i = 0; i < SAMPLES_PER_BUFFER; i += 2) {
-    float sample1 = ((float) buf[i])/2147483648.0;
-    float sample2 = ((float) buf[i+1])/2147483648.0;
+    float sample1 = ((float) buf[i]) * (1.0f / 2147483648.0f);
+    float sample2 = ((float) buf[i+1]) * (1.0f / 2147483648.0f);
 
-    buf[i] = sample2*sample1*4000000000.0;
+    buf[i] = (int32_t)(sample2 * sample1 * 4000000000.0f);
   }
 }
 

@@ -108,7 +108,7 @@ without an IDE.
     # Be sure PICO_SDK_PATH is set to directory of pico-sdk
     mkdir build
     cd build
-    cmake ..
+    cmake -DCMAKE_BUILD_TYPE=Release ..
     make
 
 Note: build failed on Fedora 43 with a compiler internal error (by

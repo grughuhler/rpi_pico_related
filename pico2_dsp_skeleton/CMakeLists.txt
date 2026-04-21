@@ -31,6 +31,9 @@ target_link_libraries(pico2_dsp_skeleton
     CMSISDSP
 )
 
+# Enable maximum math / loop optimizations
+target_compile_options(pico2_dsp_skeleton PRIVATE -Ofast)
+
 pico_add_extra_outputs(pico2_dsp_skeleton)
 
 # Enable USB stdio, disable UART stdio
