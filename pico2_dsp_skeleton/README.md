@@ -6,6 +6,13 @@ receive) i2s.  PIO also implements all needed clocks using side sets.
 
 It is presented in YouTube video: https://youtu.be/IiyGa5ss1Dw
 
+NOTE: This README is describing a later version of the software than
+shown in the video.  The code is reorganized and now supports FIR and
+IIR filters.
+
+Git tag video_pico2_dsp_skeleton refers to the older version, but it's
+best to use the latest version.
+
 A PCM1808 i2s ADC provides input data and a PCM5102A i2s DAC converts
 samples back to analog for output.
 
@@ -13,11 +20,51 @@ A cyclic triple buffer DMA is used.  While software processes one buffer,
 the ADC DMA is filling the next and the DAC DMA is sending the previous.
 Software sample processing is in-place.
 
+File main.c supports several processing options.  Look for the comment
+in main.c about defining USE_XX.  You can choose a define to process
+using an FIR or IIR filter.  Or generate a sine wave or multiply the
+right and left input channel.  Just define the USE_XX value for what
+you want and then rebuild.
+
+Files gen_fir_firwin.py, gen_fir_firwin2.py, and gen_iir.py are python
+scripts that use numpy and scipy to generate filter coefficients. You may
+hve to install numpy and scipy.
+
+All of them have a --help option.  They generate fir_coeffs.h (for
+FIR) or gen_iir.py (for IIR).  Of them, gen_fir_firwin2.py is the
+least obvious.  You give it a sequence of frequency gain pairs.  Like
+this:
+
+    gen_fir_firwin2.py --taps 401 --points 0 1.0 9000 0.1 24414.0625 1
+
+This generates IIR coefficients with a dramatically steep roll off:
+
+    gen_iir.py --order 12 --fc 4000 --btype lp --ftype ellip
+
+## PCM1808 Module Warning
+
+I bought two PCM1808 modules via Amazon.  These are the modules with
+the 5 prominent capacitors.  Only one of the two modules worked
+properly.  The problem with the bad module was with component values
+for the external anti-aliasing filter.  See the applications section
+of the PCM1808 data sheet for more on this.  There is a circuit
+diagram that shows simple RC low-pass filters being used for both the
+right and left inputs.  The bad module used C = 100 nF and R = 10K
+Ohms.  This gives a theoretical cut off frequency of around 150 Hz
+(200 Hz measured).  This is obviously no good for a component that is
+supposed to be dealing with much higher frequencies.
+
+I made my bad module work by removing the offending four components
+and bridging across the removed resistor pads.  Doing this with tiny
+surface mount components is a hassle.
+
 ## Hardware Setup
+
 The PIO heavily utilizes side-set instruction mappings. Therefore
 SCK, BCK, and LRCK require contiguous sequential GPIO pin numbers.
 
 ### Hardware Device Settings
+
 Both the PCM5102A and the PCM1808 are configured by pins tied low or high.
 #### PCM5102A
     FLT: GND (normal latency filter)
@@ -65,42 +112,11 @@ without an IDE.
     make
 
 Note: build failed on Fedora 43 with a compiler internal error (by
-definition a bug in the compiler).  Tested OK on Ubuntu 24.04 LTS.
-This will produce pico2_dsp_skeleton.uf2, the file you load onto the Pico2
-using BOOTSEL via pressing the button while powering on (see Pico docs) or
-using picotool,
+definition a bug in the compiler).
+
+Tested OK on Ubuntu 24.04 LTS.  This will produce
+pico2_dsp_skeleton.uf2, the file you load onto the Pico2 using BOOTSEL
+via pressing the button while powering on (see Pico docs) or using
+picotool,
 
     picotool load -f pico2_dsp_skeleton.uf2 -x
-
-## Generating Custom FIR Coefficients
-
-A pure Python CLI script is included to let you easily design new
-Low-Pass FIR filters with varying cutoffs or sharpness constraints
-directly into the embedded C header.  Alternatively, you can use an
-online tool such as tfilter to generate coefficients.  You might get
-a better filter from tfilter.
-
-**To run the script:**
-
-    python3 generate_fir.py --pass_hz 2000 --stop_hz 2500 --attenuation 35
-
-**Options:**
-
-    --pass_hz : The ceiling passband frequency where the filter begins
-      rolling off (default `5000`). To lower the cutoff frequency,
-      decrease this value.
-
-    --stop_hz : The frequency floor where the stopband attenuation
-      requirement must be strictly met (default `7000`). Notice that
-      setting this closer to the `--pass_hz` drastically increases
-      "sharpness" but requires more filter taps.
-
-    --attenuation : The required dampening coefficient in decibels
-      targeted in the stopband (default 35 dB). Increasing this prevents
-      more audio bleed-through but requires more coefficients.
-
-    --fs : Base sample frequency rate natively configuring math timing
-      (default `48828.125`).
-
-Once generated, rebuild the application with make so the newly created
-header array compiles into the ELF application.

@@ -21,6 +21,9 @@
 #include <stdio.h>
 #include <math.h>
 
+#define ARM_MATH_CM33
+#include "arm_math.h"
+
 // Hardware Pin Definitions
 #define PIN_SCK 10
 #define PIN_BCK 11
@@ -45,22 +48,7 @@
  * channels are interleaved. */
 #define NUM_BUFFERS 3
 
-#include "arm_math.h"
-#include "fir_coeffs.h"
-
 #define BLOCK_SIZE (SAMPLES_PER_BUFFER / 2)
-
-/* This is for an FIR implementation from Arm's CMSIS_DSP library */
-static float32_t fir_state[NUM_TAPS + BLOCK_SIZE - 1];
-static arm_fir_instance_f32 fir_left;
-
-/* Tell FIR sizes and coefficients */
-
-void init_fir()
-{
-  arm_fir_init_f32(&fir_left, NUM_TAPS, (float32_t *)&fir_coeffs[0],
-                   &fir_state[0], BLOCK_SIZE);
-}
 
 // 3 Cyclic buffers. int32_t matches the native 32-bit 2's complement format
 // from the I2S hardware.
@@ -73,6 +61,46 @@ volatile int dma_rx_ch0, dma_rx_ch1;
 volatile int rx_fill_idx = 1;
 volatile int tx_drain_idx = 2;
 volatile int process_index = -1;
+
+/* define USE_XX
+ *   USE_FIR implies calling arm_fir_f32
+ *   USE_IIR implies calling arm_biquad_cascade_df2T_f32
+ *   USE_MAKE_SINE implies calling make_sine
+ *   USE_MULT implies calling process_buffer_nult
+ *   USE_NONE implies calling nothing, samples all passed unchanged
+ *
+ */
+
+/****************** Select buffer processing **********************/
+#define USE_IIR
+
+#if defined(USE_FIR)
+
+#include "fir_coeffs.h"
+static arm_fir_instance_f32 fir_left;
+void init_fir(void)
+{
+  /* Tell FIR sizes and coefficients */
+  arm_fir_init_f32(&fir_left, NUM_TAPS, (float32_t *)&fir_coeffs[0],
+                   &fir_state[0], BLOCK_SIZE);
+}
+
+#elif defined(USE_IIR)
+
+#include "iir_coeffs.h"
+static arm_biquad_cascade_df2T_instance_f32 S2;
+void init_biquad2(void)
+{
+  arm_biquad_cascade_df2T_init_f32(&S2, NUM_STAGES, iir_coeffs,
+                                   iir_state);
+}
+
+#elif defined(USE_NONE)
+#elif defined(USE_MAKE_SINE)
+#elif defined(USE_MULT)
+#else
+#error you must define a USE_XX
+#endif
 
 void __isr dma_handler() {
   uint32_t ints = dma_hw->ints0;
@@ -148,7 +176,7 @@ void make_sine(int32_t *buf, double hz)
  * You can see a frequency shift
  */
 
-void __attribute__ ((noinline)) process_buffer_mult(int32_t *buf)
+void __attribute__ ((noinline)) do_mult(int32_t *buf)
 {
   for (int i = 0; i < SAMPLES_PER_BUFFER; i += 2) {
     float sample1 = ((float) buf[i])/2147483648.0;
@@ -158,12 +186,12 @@ void __attribute__ ((noinline)) process_buffer_mult(int32_t *buf)
   }
 }
 
-/* This function passes the left channel data through an FIR
- * filter (from Arm's CMSIS_DSP library.  Right channel data
- * is just passed through.
+/* This function passes the left channel data through a filter (from
+ * Arm's CMSIS_DSP library.  Right channel data is just passed
+ * through.
  */
 
-void __attribute__ ((noinline)) process_buffer_fir(int32_t *buf)
+void __attribute__ ((noinline)) do_filter(int32_t *buf)
 {
   float32_t float_in[BLOCK_SIZE];
   float32_t float_out[BLOCK_SIZE];
@@ -174,9 +202,11 @@ void __attribute__ ((noinline)) process_buffer_fir(int32_t *buf)
     float_in[j] = ((float)buf[i]) * (1.0f / 2147483648.0f);
   }
 
-  // Apply FIR filter
+#if defined(USE_FIR)
   arm_fir_f32(&fir_left, float_in, float_out, BLOCK_SIZE);
-
+#elif defined(USE_IIR)
+  arm_biquad_cascade_df2T_f32(&S2, float_in, float_out, BLOCK_SIZE);
+#endif
   // Convert back and place it in buf[i]
   for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
     float sample = float_out[j] * 2147483647.0f;
@@ -215,7 +245,11 @@ int main()
 
   printf("Pico 2 Audio DSP Framework Starting...\n");
 
+#if defined(USE_FIR)
   init_fir();
+#elif defined(USE_IIR)
+  init_biquad2();
+#endif
 
   // Initialize all cyclic buffers to audio zero value
   for (int i = 0; i < NUM_BUFFERS; i++) {
@@ -333,10 +367,13 @@ int main()
          * samples will be passed through unchanged.  You have the
          * time of one DMA (approx 1.3ms) to process the buffer.
          */
-        process_buffer_fir(buf);
-        //make_sine(buf, 290);
-        //process_buffer_mult(buf);
-        
+#if defined(USE_FIR) || defined(USE_IIR)
+        do_filter(buf);
+#elif defined(USE_MAKE_SINE)
+        make_sine(buf, 290);
+#elif defined (USE_MULT)
+        do_mult(buf);
+#endif        
         gpio_xor_mask(1u << PIN_DEBUG_SW); // Toggle SW GPIO
       }
     }
