@@ -24,6 +24,23 @@
 #define ARM_MATH_CM33
 #include "arm_math.h"
 
+// Use the vcvt instruction to convert between fixed point and float32.
+// bits must be a constant.
+// bits = 31 means fixed is Q31
+// bits = 30 means fixed is Q30 and so on.
+
+#define FAST_FIXED_TO_FLOAT(x, bits) ({ \
+    float32_t __result; \
+    __asm__ ("vcvt.f32.s32 %0, %1, #" #bits : "=t" (__result) : "t" (x)); \
+    __result; \
+})
+
+#define FAST_FLOAT_TO_FIXED(x, bits) ({ \
+    int32_t __result; \
+    __asm__ ("vcvt.s32.f32 %0, %1, #" #bits : "=t" (__result) : "t" (x)); \
+    __result; \
+})
+
 // Hardware Pin Definitions
 #define PIN_SCK 10
 #define PIN_BCK 11
@@ -37,10 +54,11 @@
 #define PIN_DEBUG_SW 4
 
 #ifndef PICO_DEFAULT_LED_PIN
-#define PICO_DEFAULT_LED_PI  25
+#define PICO_DEFAULT_LED_PI 25
 #endif
 
 #define PI_F 3.1415926536f
+#define PI_D 3.1415926536
 #define MAX_INT_F 2147483647.0f
 #define SAMPLE_RATE 48828.125f
 #define SAMPLES_PER_BUFFER 128
@@ -63,16 +81,17 @@ volatile int tx_drain_idx = 2;
 volatile int process_index = -1;
 
 /* define USE_XX
- *   USE_FIR implies calling arm_fir_f32
- *   USE_IIR implies calling arm_biquad_cascade_df2T_f32
+ *   USE_FIR implies calling do_filter
+ *   USE_IIR implies calling do_filter
  *   USE_MAKE_SINE implies calling make_sine
- *   USE_MULT implies calling process_buffer_nult
+ *   USE_MULT implies calling do_mult_nult
+ *   USE_DETECT implies calling Goertzel tone detector
  *   USE_NONE implies calling nothing, samples all passed unchanged
  *
  */
 
 /****************** Select buffer processing **********************/
-#define USE_FIR
+#define USE_IIR
 
 #if defined(USE_FIR)
 
@@ -98,6 +117,51 @@ void init_biquad2(void)
 #elif defined(USE_NONE)
 #elif defined(USE_MAKE_SINE)
 #elif defined(USE_MULT)
+#elif defined(USE_DETECT)
+/* Goertzel - call goertzel_update in a loop.  Whenever .ready is
+ *  true, check confidence_scope.  A value > ~0.9 indicates presence
+ *  of tone.  But experiment with this threshold in your application.
+/* --- Goertzel Object Structure --- */
+typedef struct {
+  float32_t coeff;
+  float32_t v1, v2;
+  float32_t total_energy;
+  uint32_t samples_processed;
+  uint32_t samples_needed;
+  float32_t confidence_score;
+  bool ready;
+  float32_t dc_prev_in;
+  float32_t dc_prev_out;
+} GoertzelDetector;
+
+GoertzelDetector detector;
+
+/**
+ * Initializes the goertzel detector. 
+ *   target_f - frequency of tone to detect.  Works worse for
+ *              small frequencies.  So, test carefully if
+ *              target_f is less than ~100 Hz.
+ */
+void init_goertzel(GoertzelDetector *S, float32_t target_f) {
+  // omega must be a double and must call cos() and not a float32
+  // version of it becuase values returned for small target_f are
+  // so close to one.  Could use float if target_f will always be
+  // greater than ~500 Hz.
+  double omega = (2.0 * PI_D * (double) target_f) / (double) SAMPLE_RATE;
+  S->coeff = 2.0 * cos(omega);
+    
+  // Increasing cycles sharpens the filter but adds execution time.
+  // Integer values from 4.0 to 8.0 look reasonable, higher OK for
+  // higher frequences.  Experiment with this in your application.
+  float32_t cycles = (target_f <= 400.0) ? 4.0f : 8.0f;
+  uint32_t ideal_samples = (uint32_t)(cycles * SAMPLE_RATE / target_f);
+  if (ideal_samples < 256) ideal_samples = 256;
+
+  S->samples_needed = ((ideal_samples + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
+  S->v1 = 0; S->v2 = 0; S->total_energy = 0; S->samples_processed = 0;
+  S->dc_prev_in = 0; S->dc_prev_out = 0;
+  S->ready = false;
+}
 #else
 #error you must define a USE_XX
 #endif
@@ -151,26 +215,37 @@ void __isr dma_handler() {
   }
 }
 
+
+#if defined(USE_MAKE_SINE)
 /* This is a test function you can use to ignore the input data
- * and just output a generated sine wave.
+ * and just output a generated sine wave on both the left and
+ * right channels.
  */
 
-void make_sine(int32_t *buf, double hz)
+void make_sine(int32_t *buf, double hz_left, double hz_right)
 {
-  static float phase = 0.0f;
-  float phase_increment = 2.0f * PI_F * hz / SAMPLE_RATE;
+  static float phase_left = 0.0f, phase_right = 0.0f;
+  float phase_increment_left = 2.0f * PI_F * hz_left / SAMPLE_RATE;
+  float phase_increment_right = 2.0f * PI_F * hz_right / SAMPLE_RATE;
 
   for (int i = 0; i < SAMPLES_PER_BUFFER; i += 2) {
-    float sample = arm_sin_f32(phase) * (MAX_INT_F / 2.0f);
-    buf[i] = (int32_t)sample;       // Left channel
-    buf[i+1] = (int32_t)sample;     // Right channel
-    phase += phase_increment;
-    if (phase > 2.0f * PI_F) {
-      phase -= 2.0f * PI_F;
+    float sample = arm_sin_f32(phase_left);
+    // The "30" makes the sine wave go from -0.5 to 0.5.
+    buf[i] = FAST_FLOAT_TO_FIXED(sample, 30);;   // Left channel
+    sample = arm_sin_f32(phase_right);
+    buf[i+1] = FAST_FLOAT_TO_FIXED(sample, 30);; // right channel
+    phase_left += phase_increment_left;
+    if (phase_left > 2.0f * PI_F) {
+      phase_left -= 2.0f * PI_F;
+    }
+    phase_right += phase_increment_right;
+    if (phase_right > 2.0f * PI_F) {
+      phase_right -= 2.0f * PI_F;
     }
   }
 }
 
+#defined (USE_MULT)
 /* This function sets the output of the left channel to be
  * the product of the signals from the left and right channels.
  * You can see a frequency shift
@@ -185,38 +260,122 @@ void __attribute__ ((noinline)) do_mult(int32_t *buf)
     buf[i] = (int32_t)(sample2 * sample1 * 4000000000.0f);
   }
 }
+#endif
 
+void buf_left_to_float(q31_t *buf, float32_t *float_in)
+{
+  // De-interleave buf[i] (left channel) and convert to float
+  // buf[i] is left, buf[i+1] is right.
+  for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
+    float_in[j] = FAST_FIXED_TO_FLOAT(buf[i], 31);
+  }
+}
+
+void float_to_buf_left(float32_t *float_out, q31_t *buf)
+{
+  // Convert back and place it in buf[i]
+  for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
+    buf[i] = FAST_FLOAT_TO_FIXED(float_out[j], 31);
+  }
+}
+
+#if defined(USE_FIR) || defined(USE_IIR)
 /* This function passes the left channel data through a filter (from
  * Arm's CMSIS_DSP library.  Right channel data is just passed
  * through.
  */
 
-void __attribute__ ((noinline)) do_filter(int32_t *buf)
+void __attribute__ ((noinline)) do_filter(q31_t *buf)
 {
   float32_t float_in[BLOCK_SIZE];
   float32_t float_out[BLOCK_SIZE];
 
-  // De-interleave buf[i] (left channel) and convert to float
-  // buf[i] is left, buf[i+1] is right.
-  for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
-    float_in[j] = ((float)buf[i]) * (1.0f / 2147483648.0f);
-  }
+  buf_left_to_float(buf, float_in);
 
 #if defined(USE_FIR)
   arm_fir_f32(&fir_left, float_in, float_out, BLOCK_SIZE);
 #elif defined(USE_IIR)
   arm_biquad_cascade_df2T_f32(&S2, float_in, float_out, BLOCK_SIZE);
 #endif
-  // Convert back and place it in buf[i]
-  for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
-    float sample = float_out[j] * 2147483647.0f;
-    // Simple clipping to prevent overflow
-    if (sample > 2147483647.0f) sample = 2147483647.0f;
-    if (sample < -2147483648.0f) sample = -2147483648.0f;
-    buf[i] = (int32_t)sample;
-    // buf[i+1] remains unaltered, passing the signal straight through
-  }
+
+  float_to_buf_left(float_out, buf);
 }
+#endif
+
+#if defined(USE_DETECT)
+
+/* Detects tones using a Goertzel method.
+ * Call this function in the main block processing loop.
+ * When .ready ** .confidence_score is high enough, a tone
+ * is present, but the confidence_score can bounce around your
+ * chosen threshold if the tone is near the detection boundary.
+ * Some extra logic to ensure the detection is stable may be a
+ * good idea.
+ */
+
+void goertzel_update(GoertzelDetector *S, float32_t *pSrc) {
+    float32_t v0;
+    float32_t v1 = S->v1;
+    float32_t v2 = S->v2;
+    float32_t energy_sum = 0.0f;
+    const float32_t alpha = 0.99f; // DC Blocker coefficient
+
+    for (uint32_t i = 0; i < BLOCK_SIZE; i++) {
+        // 1. Simple DC Blocker (High Pass Filter)
+        // This is CRITICAL for 60Hz detection
+        float32_t clean_sample = pSrc[i] - S->dc_prev_in + (alpha * S->dc_prev_out);
+        S->dc_prev_in = pSrc[i];
+        S->dc_prev_out = clean_sample;
+
+        // 2. Goertzel Feedback
+        v0 = clean_sample + (S->coeff * v1) - v2;
+        v2 = v1;
+        v1 = v0;
+        energy_sum += clean_sample * clean_sample;
+    }
+
+    S->v1 = v1; S->v2 = v2;
+    S->total_energy += energy_sum;
+    S->samples_processed += BLOCK_SIZE;
+
+    if (S->samples_processed >= S->samples_needed) {
+        float32_t pwr = (v1 * v1) + (v2 * v2) - (S->coeff * v1 * v2);
+        float32_t n = (float32_t)S->samples_processed;
+
+        if (S->total_energy > 1e-9f) {
+            // Updated normalization to match your observed 0.9+ peaks
+            S->confidence_score = (2.0f * pwr) / (S->total_energy * n);
+        } else {
+            S->confidence_score = 0.0f;
+        }
+
+        S->ready = true;
+        S->v1 = 0; S->v2 = 0; S->total_energy = 0; S->samples_processed = 0;
+    } else {
+        S->ready = false;
+    }
+}
+
+// Covert samples and call Geortzel detector
+void do_detect(GoertzelDetector *detector, q31_t *buf)
+{
+  float32_t float_in[BLOCK_SIZE];
+  static float32_t c = 0.0f;
+
+  buf_left_to_float(buf, float_in);
+  goertzel_update(detector, float_in);
+#if 0
+  if (detector->ready) {
+    c = detector->confidence_score;
+    if (c > 2.0) c = 2.0;
+  }
+  for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
+    buf[i] = FAST_FLOAT_TO_FIXED(c, 31);
+  }
+#endif
+}
+
+#endif
 
 int main()
 {
@@ -244,12 +403,6 @@ int main()
   gpio_set_dir(PIN_DEBUG_SW, GPIO_OUT);
 
   printf("Pico 2 Audio DSP Framework Starting...\n");
-
-#if defined(USE_FIR)
-  init_fir();
-#elif defined(USE_IIR)
-  init_biquad2();
-#endif
 
   // Initialize all cyclic buffers to audio zero value
   for (int i = 0; i < NUM_BUFFERS; i++) {
@@ -343,6 +496,14 @@ int main()
     pio_sm_put(pio, sm, 0);
   }
 
+#if defined(USE_FIR)
+  init_fir();
+#elif defined(USE_IIR)
+  init_biquad2();
+#elif defined (USE_DETECT)
+  init_goertzel(&detector, 1000.0f);
+#endif
+
   // 7. Start the DMAs simultaneously
   uint32_t start_mask = (1u << dma_rx_ch0) | (1u << dma_tx_ch0);
   dma_start_channel_mask(start_mask);
@@ -370,9 +531,19 @@ int main()
 #if defined(USE_FIR) || defined(USE_IIR)
         do_filter(buf);
 #elif defined(USE_MAKE_SINE)
-        make_sine(buf, 290);
+        make_sine(buf, 240, 360);
 #elif defined (USE_MULT)
         do_mult(buf);
+#elif defined(USE_DETECT)
+        do_detect(&detector, buf);
+        if (detector.ready) {
+          //printf("%f\n", detector.confidence_score);
+          if (detector.confidence_score > 0.9f) {
+            gpio_put(PICO_DEFAULT_LED_PIN, 1);
+          } else {
+            gpio_put(PICO_DEFAULT_LED_PIN, 0);
+          }
+        }
 #endif        
         gpio_xor_mask(1u << PIN_DEBUG_SW); // Toggle SW GPIO
       }
