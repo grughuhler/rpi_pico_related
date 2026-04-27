@@ -8,7 +8,7 @@ It is presented in YouTube video: https://youtu.be/IiyGa5ss1Dw
 
 NOTE: This README is describing a later version of the software than
 shown in the video.  The code is reorganized and now supports FIR and
-IIR filters.
+IIR filters and more.
 
 Git tag video_pico2_dsp_skeleton refers to the older version, but it's
 best to use the latest version.
@@ -20,11 +20,18 @@ A cyclic triple buffer DMA is used.  While software processes one buffer,
 the ADC DMA is filling the next and the DAC DMA is sending the previous.
 Software sample processing is in-place.
 
-File main.c supports several processing options.  Look for the comment
-in main.c about defining USE_XX.  You can choose a define to process
-using an FIR or IIR filter.  Or generate a sine wave or multiply the
-right and left input channel.  Just define the USE_XX value for what
-you want and then rebuild.
+There are many files with name dsp_XXX.c.  Each implements a different
+DSP demonstration, but each provides the same interface to main.c.
+
+    void init_dsp(void);
+    void process_buf_dsp(q31_t *buf);
+
+The build process creates an executable for each dsp_XXX.c file,
+naming the result XXX.elf.  The file to flash onto the Pico2 is
+XXX.uf2.  For example, to run the FIR demontration, flash file
+fir.uf2.
+
+See each dsp_XXX.c file for more information.
 
 Files gen_fir_firwin.py, gen_fir_firwin2.py, and gen_iir.py are python
 scripts that use numpy and scipy to generate filter coefficients. You may
@@ -111,6 +118,8 @@ without an IDE.
     cmake -DCMAKE_BUILD_TYPE=Release ..
     make
 
+This will build all of the xxx.uf2 files.
+
 Note: build failed on Fedora 43 with a compiler internal error (by
 definition a bug in the compiler).
 
@@ -119,4 +128,4 @@ pico2_dsp_skeleton.uf2, the file you load onto the Pico2 using BOOTSEL
 via pressing the button while powering on (see Pico docs) or using
 picotool,
 
-    picotool load -f pico2_dsp_skeleton.uf2 -x
+    picotool load -f fir.uf2 -x
