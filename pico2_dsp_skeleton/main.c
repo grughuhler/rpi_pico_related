@@ -24,6 +24,23 @@
 #define ARM_MATH_CM33
 #include "arm_math.h"
 
+/* define exactly one USE_XX to select DSP function.
+ *   USE_FIR implies calling do_filter
+ *   USE_IIR implies calling do_filter
+ *   USE_MAKE_SINE implies calling make_sine
+ *   USE_MULT implies calling do_mult_nult
+ *   USE_DETECT implies calling Goertzel tone detector.  When tone is
+                detected LED lights.
+ *   USE_FFT imples calling do_fft.  Frequency bins above a threshold
+ *           are printed occasionally.
+ *   USE_NONE implies calling nothing, samples all passed unchanged
+ *
+ */
+
+/****************** Select buffer processing **********************/
+
+#define USE_FFT
+
 // Use the vcvt instruction to convert between fixed point and float32.
 // bits must be a constant.
 // bits = 31 means fixed is Q31
@@ -61,11 +78,15 @@
 #define PI_D 3.1415926536
 #define MAX_INT_F 2147483647.0f
 #define SAMPLE_RATE 48828.125f
-#define SAMPLES_PER_BUFFER 128
-/* That's 64 stereo samples per buffer.  Samples for the two
- * channels are interleaved. */
+
 #define NUM_BUFFERS 3
 
+/* This is the place to choose the size of the triple buffers.  This includes
+ * samples for botht the left and right channels.  DSP processes one channel
+ * at a time so the DSP algorithm BLOCK_SIZE is SAMPLES_PER_BUFFER/2
+ */
+
+#define SAMPLES_PER_BUFFER 128
 #define BLOCK_SIZE (SAMPLES_PER_BUFFER / 2)
 
 // 3 Cyclic buffers. int32_t matches the native 32-bit 2's complement format
@@ -79,23 +100,6 @@ volatile int dma_rx_ch0, dma_rx_ch1;
 volatile int rx_fill_idx = 1;
 volatile int tx_drain_idx = 2;
 volatile int process_index = -1;
-
-/* define exactly one USE_XX to select DSP function.
- *   USE_FIR implies calling do_filter
- *   USE_IIR implies calling do_filter
- *   USE_MAKE_SINE implies calling make_sine
- *   USE_MULT implies calling do_mult_nult
- *   USE_DETECT implies calling Goertzel tone detector.  When tone is
-                detected LED lights.
- *   USE_FFT imples calling do_fft.  Frequency bins above a threshold
- *           are printed occasionally.
- *   USE_NONE implies calling nothing, samples all passed unchanged
- *
- */
-
-/****************** Select buffer processing **********************/
-
-#define USE_FIR
 
 #if defined(USE_FIR)
 
@@ -160,7 +164,9 @@ void __attribute__ ((noinline)) init_goertzel(GoertzelDetector *S, float32_t tar
   // higher frequences.  Experiment with this in your application.
   float32_t cycles = (target_f <= 400.0) ? 4.0f : 8.0f;
   uint32_t ideal_samples = (uint32_t)(cycles * SAMPLE_RATE / target_f);
-  if (ideal_samples < 256) ideal_samples = 256;
+
+  // If BLOCK_SIZE is large, this could be a problem
+  if (ideal_samples < BLOCK_SIZE) ideal_samples = BLOCK_SIZE;
 
   S->samples_needed = ((ideal_samples + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
   S->v1 = 0; S->v2 = 0; S->total_energy = 0; S->samples_processed = 0;
@@ -197,7 +203,6 @@ void init_sliding_fft() {
         hann_window[i] = 0.5f * (1.0f - arm_cos_f32(angle));
     }
 }
-
 #else
 #error you must define a USE_XX
 #endif
@@ -280,8 +285,9 @@ void make_sine(int32_t *buf, double hz_left, double hz_right)
     }
   }
 }
+#endif
 
-#defined (USE_MULT)
+#if defined(USE_MULT)
 /* This function sets the output of the left channel to be
  * the product of the signals from the left and right channels.
  * You can see a frequency shift
@@ -390,6 +396,15 @@ void goertzel_update(GoertzelDetector *S, float32_t *pSrc) {
   } else {
     S->ready = false;
   }
+
+  if (detector.ready) {
+    //printf("%f\n", detector.confidence_score);
+    if (detector.confidence_score > 0.9f) {
+      gpio_put(PICO_DEFAULT_LED_PIN, 1);
+    } else {
+      gpio_put(PICO_DEFAULT_LED_PIN, 0);
+    }
+  }
 }
 
 // Covert samples and call Geortzel detector
@@ -419,11 +434,8 @@ void do_detect(GoertzelDetector *detector, q31_t *buf)
 // Max expected magnitude for a 1024 FFT with Hanning window is ~256
 #define FFT_MAX_MAG 256.0f
 
-#include "arm_math.h"
-
 // Pre-calculate the conversion constant: 20 / ln(10)
 #define LN_TO_DB_CONV 8.685889638f
-#define FFT_MAX_MAG 256.0f
 
 void convert_to_db(float32_t *mag_input, float32_t *db_output, uint32_t count) {
     // 1. Normalize the magnitudes first
@@ -444,18 +456,18 @@ void convert_to_db(float32_t *mag_input, float32_t *db_output, uint32_t count) {
     arm_scale_f32(db_output, LN_TO_DB_CONV, db_output, count);
 }
 
-void process_sliding_fft(float32_t *input_64, float32_t *output_mag)
+void process_sliding_fft(float32_t *float_in, float32_t *output_mag)
 {
   static uint32_t write_idx = 0;
   float32_t *contiguous_window;
 
   // Double-write the new samples to maintain the mirror
   // Write to the current head
-  memcpy(&fft_input_mirrored_history[write_idx], input_64,
+  memcpy(&fft_input_mirrored_history[write_idx], float_in,
          BLOCK_SIZE * sizeof(float32_t));
   // Mirror the write to the second half
   memcpy(&fft_input_mirrored_history[write_idx + FFT_SIZE],
-         input_64, BLOCK_SIZE * sizeof(float32_t));
+         float_in, BLOCK_SIZE * sizeof(float32_t));
   // Advance the write index circularly (within the first 1024)
   write_idx = (write_idx + BLOCK_SIZE) % FFT_SIZE;
 
@@ -497,7 +509,6 @@ void do_fft(q31_t *buf)
     pr_limit += 1;
   }
 }
-
 
 #endif
 
@@ -625,7 +636,8 @@ int main()
 #elif defined(USE_IIR)
   init_biquad2();
 #elif defined (USE_DETECT)
-  init_goertzel(&detector, 1000.0f);
+  // Set frequency of tone to detect
+  init_goertzel(&detector, 2000.0f);
 #elif defined(USE_FFT)
   init_sliding_fft();
 #endif
@@ -662,14 +674,6 @@ int main()
         do_mult(buf);
 #elif defined(USE_DETECT)
         do_detect(&detector, buf);
-        if (detector.ready) {
-          //printf("%f\n", detector.confidence_score);
-          if (detector.confidence_score > 0.9f) {
-            gpio_put(PICO_DEFAULT_LED_PIN, 1);
-          } else {
-            gpio_put(PICO_DEFAULT_LED_PIN, 0);
-          }
-        }
 #elif defined(USE_FFT)
         do_fft(buf);
 #endif        
