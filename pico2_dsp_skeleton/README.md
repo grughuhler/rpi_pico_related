@@ -37,6 +37,8 @@ Files gen_fir_firwin.py, gen_fir_firwin2.py, and gen_iir.py are python
 scripts that use numpy and scipy to generate filter coefficients. You may
 hve to install numpy and scipy.
 
+    sudo apt install python3-scipy python3-numpy
+
 All of them have a --help option.  They generate fir_coeffs.h (for
 FIR) or gen_iir.py (for IIR).  Of them, gen_fir_firwin2.py is the
 least obvious.  You give it a sequence of frequency gain pairs.  Like

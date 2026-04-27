@@ -2,6 +2,9 @@
 === I interacted with it quite a bit after its initial work so this
 === spec was not complete enough to allow it to completely autonomously
 === create the software.
+===
+=== Later, I did still more work.  So, this specification is not even
+=== close to describing the current version of the software.
 
 This file contains a specification for a program that you are to write
 and compile.
