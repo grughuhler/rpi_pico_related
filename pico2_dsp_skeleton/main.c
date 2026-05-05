@@ -111,8 +111,10 @@ int main()
   gpio_set_dir(PIN_DEBUG_RX, GPIO_OUT);
   gpio_init(PIN_DEBUG_TX);
   gpio_set_dir(PIN_DEBUG_TX, GPIO_OUT);
-  gpio_init(PIN_DEBUG_SW);
-  gpio_set_dir(PIN_DEBUG_SW, GPIO_OUT);
+  gpio_init(PIN_DEBUG_SW0);
+  gpio_set_dir(PIN_DEBUG_SW0, GPIO_OUT);
+  gpio_init(PIN_DEBUG_SW1);
+  gpio_set_dir(PIN_DEBUG_SW1, GPIO_OUT);
 
   printf("Pico 2 Audio DSP Framework Starting...\n");
 
@@ -226,7 +228,7 @@ int main()
     if (process_index != last_processed) {
       last_processed = process_index;
 
-      gpio_xor_mask(1u << PIN_DEBUG_SW); // Toggle SW GPIO
+      gpio_xor_mask(1u << PIN_DEBUG_SW0); // Toggle SW GPIO
       if (last_processed >= 0 && last_processed < NUM_BUFFERS) {
         int32_t *buf = audio_buffers[last_processed];
 
@@ -235,7 +237,7 @@ int main()
          * time of one DMA (approx 1.3ms) to process the buffer.
          */
         process_buf_dsp(buf);
-        gpio_xor_mask(1u << PIN_DEBUG_SW); // Toggle SW GPIO
+        gpio_xor_mask(1u << PIN_DEBUG_SW0); // Toggle SW GPIO
       }
     }
 

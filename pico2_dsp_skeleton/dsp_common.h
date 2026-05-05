@@ -17,7 +17,8 @@
 // Debug Pins for Timing Analysis.  These are just GPIO outs.
 #define PIN_DEBUG_RX 2
 #define PIN_DEBUG_TX 3
-#define PIN_DEBUG_SW 4
+#define PIN_DEBUG_SW0 4
+#define PIN_DEBUG_SW1 5
 
 #ifndef PICO_DEFAULT_LED_PIN
 #define PICO_DEFAULT_LED_PIN 25
@@ -26,9 +27,20 @@
 #define PI_F 3.1415926536f
 #define PI_D 3.1415926536
 #define MAX_INT_F 2147483647.0f
+
+// Dpn't change SAMPLE_RATE unless you work out a new
+// clock generation scheme.
 #define SAMPLE_RATE 48828.125f
 
 #define NUM_BUFFERS 3
+
+// BLOCK_SIZE is the number of samples per buffer in the triple DMA.
+// It will always be SAMPLES_PER_BUFFER/2 since SAMPLES_PER_BUFFER
+// is the number of stereo samples per buffer.  BLOCK_SIZE indirectly
+// determines software's realtime deadline per buffer.  Software has
+// BLOCK_SIZE/SAMPLE_RATE seconds in which it must process a buffer.
+// In theory, you can change BLOCK_SIZE (by changing SAMPLES_PER_BUFFER),
+// but this is not very well tested.  Change with caution.
 #define SAMPLES_PER_BUFFER 128
 #define BLOCK_SIZE (SAMPLES_PER_BUFFER / 2)
 

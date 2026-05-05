@@ -28,6 +28,7 @@ target_link_libraries(dsp_common PUBLIC
     hardware_pio
     hardware_dma
     hardware_clocks
+    pico_multicore
     CMSISDSP
 )
 
@@ -35,7 +36,7 @@ target_link_libraries(dsp_common PUBLIC
 target_compile_options(dsp_common PUBLIC -Ofast)
 
 # List of all DSP modules
-set(DSP_MODULES fir iir make_sine mult detect fft fft_filter none)
+set(DSP_MODULES fir iir make_sine mult detect fft fft_filter none pitch pitch_fft)
 
 # Create an executable target for each module
 foreach(module IN LISTS DSP_MODULES)

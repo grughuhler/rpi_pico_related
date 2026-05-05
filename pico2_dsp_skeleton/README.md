@@ -6,6 +6,8 @@ receive) i2s.  PIO also implements all needed clocks using side sets.
 
 It is presented in YouTube video: https://youtu.be/IiyGa5ss1Dw
 
+It uses ARM's CMSIS_DSP library.
+
 NOTE: This README is describing a later version of the software than
 shown in the video.  The code is reorganized and now supports FIR and
 IIR filters and more.
@@ -20,6 +22,8 @@ A cyclic triple buffer DMA is used.  While software processes one buffer,
 the ADC DMA is filling the next and the DAC DMA is sending the previous.
 Software sample processing is in-place.
 
+## Algorithms
+
 There are many files with name dsp_XXX.c.  Each implements a different
 DSP demonstration, but each provides the same interface to main.c.
 
@@ -31,7 +35,46 @@ naming the result XXX.elf.  The file to flash onto the Pico2 is
 XXX.uf2.  For example, to run the FIR demontration, flash file
 fir.uf2.
 
-See each dsp_XXX.c file for more information.
+See each dsp_XXX.c file for more information, but here is a summary:
+
+dsp_fir.c implements the FIR filter with coefficients from
+fir_coeffs.h and applies it to the left channel.
+
+dsp_fft_filter.c implements with FIR filter with coefficients from
+fft_filter_coeffs.h using FFT convolution.  This allows a somewhat
+larger FIR filter to be done within realtime constraints that stem
+from a 64 sample block size.  See the file for constraints on the
+number of taps allowed.  The left channel is filtered.
+
+dsp_iir.c implements the IIR filter with coefficient from iir_coeffs.h
+and applies it to the left channel.
+
+dsp_none.c does not process the signal at all.  It just passes it
+though.
+
+dsp_make_sine.c generates sine waves, paying no attention to input.
+
+dsp_mult.c multiplies one of the signals by the other.  You can see
+the resulting frequency shift on the left channel output.
+
+dsp_detect.c uses the Goertzel algorithm to detect a specific tone on
+the left channel.  specified by FREQ_TO_DETECT in the file.  It lights
+the onboard LED when the tone is seen.
+
+dsp_fft.c computes an FFT of the signal on the left channel and prints
+the frequency of the top bin using the Pico 2's USB serial.  This is
+not done in realtime and uses core 1 for the non-realtime processing.
+
+dsp_pitch.c implements a pitch detector.  That is it tries to identify
+the musical note seen on the left channel.  It cannot detect extremely
+low notes or notes higher than ~ 6 KHz.  Pitch detection is a rather
+hard problem due to harmonics and noise.  It is not done in realtime
+and uses core 1 for the algorithm.
+
+dsp_pitch_fft.c is basically the same as dsp_pitch.c but uses FFTs
+to speed the computation, rather like dsp_fft_filter.c
+
+## Generating Filter Coefficients
 
 Files gen_fir_firwin.py, gen_fir_firwin2.py, and gen_iir.py are python
 scripts that use numpy and scipy to generate filter coefficients. You may
