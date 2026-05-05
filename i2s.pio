@@ -1,0 +1,98 @@
+; Copyright 2026 Grug Huhler
+; License: SPDX BSD-2-Clause
+; PIO program to implement 4-wire i2s meaning i2s with both send
+; and receive data signals.
+
+.program i2s
+.side_set 3
+
+; Sideset map: bit 0 = SCK, bit 1 = BCK, bit 2 = LRCK
+; Clocked at 25 MHz (divider = 6.0 based on 150 MHz system clock).
+; 1 loop iteration = 8 instructions = 8 PIO cycles = 1 BCK cycle = 4 SCK cycles.
+
+PUBLIC entry_point:
+; Left channel (LRCK = 0)
+left_loop:
+    out pins, 1      side 0b000
+    nop              side 0b001
+    nop              side 0b000
+    nop              side 0b001
+    in pins, 1       side 0b010  ; BCK=1 (rising edge)
+    nop              side 0b011
+    nop              side 0b010
+    jmp x-- left_loop side 0b011
+
+    ; Left channel last bit (bit 31) - LRCK toggles to 1 early for Next channel
+    out pins, 1      side 0b100  ; LRCK=1, BCK=0
+    nop              side 0b101
+    nop              side 0b100
+    nop              side 0b101
+    in pins, 1       side 0b110  ; LRCK=1, BCK=1
+    nop              side 0b111
+    nop              side 0b110
+    set x, 30        side 0b111  ; Reset X for right channel
+
+; Right channel (LRCK = 1)
+right_loop:
+    out pins, 1      side 0b100
+    nop              side 0b101
+    nop              side 0b100
+    nop              side 0b101
+    in pins, 1       side 0b110  ; BCK=1
+    nop              side 0b111
+    nop              side 0b110
+    jmp x-- right_loop side 0b111
+
+    ; Right channel last bit (bit 31) - LRCK toggles to 0 early for Next channel
+    out pins, 1      side 0b000  ; LRCK=0, BCK=0
+    nop              side 0b001
+    nop              side 0b000
+    nop              side 0b001
+    in pins, 1       side 0b010  ; LRCK=0, BCK=1
+    nop              side 0b011
+    nop              side 0b010
+    set x, 30        side 0b011  ; Reset X for left channel, implicitly wraps to left_loop
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+static inline void i2s_program_init(PIO pio, uint sm, uint offset, uint data_pin_out, uint data_pin_in, uint clock_pin_base) {
+    pio_sm_config sm_config = i2s_program_get_default_config(offset);
+    
+    // Out pins: 1 pin for DOUT
+    sm_config_set_out_pins(&sm_config, data_pin_out, 1);
+    // In pins: 1 pin for DIN
+    sm_config_set_in_pins(&sm_config, data_pin_in);
+    // Sideset pins: 3 pins for SCK, BCK, LRCK
+    sm_config_set_sideset_pins(&sm_config, clock_pin_base);
+    
+    // Shift configure: MSB first = shift left (shift_right = false)
+    // Autopush/Autopull enabled, threshold = 32
+    sm_config_set_out_shift(&sm_config, false, true, 32); 
+    sm_config_set_in_shift(&sm_config, false, true, 32); 
+    
+    // Set FIFO to independent RX/TX
+    sm_config_set_fifo_join(&sm_config, PIO_FIFO_JOIN_NONE);
+    
+    // Pin directions
+    pio_sm_set_consecutive_pindirs(pio, sm, clock_pin_base, 3, true); // SCK, BCK, LRCK out
+    pio_sm_set_consecutive_pindirs(pio, sm, data_pin_out, 1, true);   // DOUT out
+    pio_sm_set_consecutive_pindirs(pio, sm, data_pin_in,  1, false);  // DIN in
+    
+    // Init GPIO targets
+    pio_gpio_init(pio, data_pin_out);
+    pio_gpio_init(pio, data_pin_in);
+    pio_gpio_init(pio, clock_pin_base);     // SCK
+    pio_gpio_init(pio, clock_pin_base + 1); // BCK
+    pio_gpio_init(pio, clock_pin_base + 2); // LRCK
+    
+    // Clock divider: PICO clock is 150MHz. We want PIO running at 25MHz.
+    // 150 / 25 = 6.0
+    sm_config_set_clkdiv(&sm_config, 6.0f);
+    
+    pio_sm_init(pio, sm, offset, &sm_config);
+    
+    // Prime the X register for the main loop!
+    pio_sm_exec(pio, sm, pio_encode_set(pio_x, 30));
+}
+%}

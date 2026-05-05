@@ -1,0 +1,44 @@
+# Install toolchain Ubuntu:
+sudo apt update
+sudo apt install cmake gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
+sudo apt install g++ libstdc++-arm-none-eabi-newlib
+sudo apt install build-essential pkg-config libusb-1.0-0-dev cmake
+
+Fedora:
+sudo dnf install gcc-arm-linux-gnu arm-none-eabi-gcc-cs-c++ arm-none-eabi-gcc-cs\
+     arm-none-eabi-binutils arm-none-eabi-newlib
+sudo dnf install libusb1-devel pkg-config cmake
+
+# Get pico C SDK and examples
+mkdir rpi_pico
+cd rpi_pico
+git clone https://github.com/raspberrypi/pico-sdk.git --branch master
+cd pico-sdk
+git submodule update --init
+cd ..
+git clone https://github.com/raspberrypi/pico-examples.git --branch master
+
+# Set path environment variable
+export PICO_SDK_PATH=path to directory pico-sdk
+
+# Ensure that a test build is OK
+cd pico-examples
+mkdir build
+cd build
+cmake -DPICO_BOARD=pico2 ..
+cd blink
+make
+
+# You can also get and build picotool.  It lets you flash without holding down
+# the BOOTSEL button.
+
+Be in rpi_pico
+git clone https://github.com/raspberrypi/picotool.git
+cd picotool
+mkdir build
+cd build
+cmake ..
+make
+
+# udev rules to run picotool without sudo
+sudo cp picotool/udev/60-picotool.rules /etc/udev/rules.d
