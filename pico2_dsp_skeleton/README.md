@@ -55,7 +55,7 @@ though.
 dsp_make_sine.c generates sine waves, paying no attention to input.
 
 dsp_mult.c multiplies one of the signals by the other.  You can see
-the resulting frequency shift on the left channel output.
+the resulting frequency shifts on the left channel output.
 
 dsp_detect.c uses the Goertzel algorithm to detect a specific tone on
 the left channel.  specified by FREQ_TO_DETECT in the file.  It lights
@@ -72,7 +72,7 @@ hard problem due to harmonics and noise.  It is not done in realtime
 and uses core 1 for the algorithm.
 
 dsp_pitch_fft.c is basically the same as dsp_pitch.c but uses FFTs
-to speed the computation, rather like dsp_fft_filter.c
+to speed the computation rather like dsp_fft_filter.c
 
 ## Generating Filter Coefficients
 
@@ -82,16 +82,16 @@ hve to install numpy and scipy.
 
     sudo apt install python3-scipy python3-numpy
 
-All of them have a --help option.  They generate fir_coeffs.h (for
-FIR) or gen_iir.py (for IIR).  Of them, gen_fir_firwin2.py is the
-least obvious.  You give it a sequence of frequency gain pairs.  Like
-this:
+All of them have a --help option.  They generate fir_coeffs.h (for fir
+and fft_filter) or gen_iir.py (for iir).  Of them, gen_fir_firwin2.py
+is the least obvious.  You give it a sequence of frequency gain pairs.
+Like this:
 
     gen_fir_firwin2.py --taps 401 --points 0 1.0 9000 0.1 24414.0625 1
 
 This generates IIR coefficients with a dramatically steep roll off:
 
-    gen_iir.py --order 12 --fc 4000 --btype lp --ftype ellip
+    gen_iir.py --order 8 --fc 4000 --btype lp --ftype ellip
 
 ## PCM1808 Module Warning
 
@@ -134,16 +134,26 @@ Both the PCM5102A and the PCM1808 are configured by pins tied low or high.
 
 ### Pinout
 
-Look at main.c
+Look at dsp_common.h.  In addition to pins related to the i2s devices
+there are pins named with _DEBUG_.  These are used to measure times
+and see if software is meeting realtime constraints.  There are two
+for the RX and TX DMAs.  These toggle whenever a DMA completes and is
+restarted.  There are also two for software, one for core 0 and one
+for core 1.  The idea is that these are high when software is actively
+processing a buffer.  In particular if the one for core 0 is high for
+a time longer than a DMA, core 0 software is not meeting its realtime
+constraint.  I use the ADALM2000's logic analyzer (digital) pins to
+measure this.
 
-Pin numbers can be set in the hardware macros inside main.c. However,
-clocks 10, 11, and 12 must strictly remain sequential.
+Pin numbers can be set in the hardware macros inside
+dsp_common.h. However, clocks 10, 11, and 12 must be sequential.
 
 ## Software Pipeline Execution Details
 
 PIO generates all clock schedules explicitly using simple integer
 dividers from a 150MHz core clock to yield an exactly 48828.125 Hz
-sample stereo rate without jitter.  Yes, that's a weird sample rate.
+sample stereo rate without jitter.  Yes, that's a weird sample rate,
+and it is hard to change.
 
 ## Building
 
@@ -168,9 +178,8 @@ This will build all of the xxx.uf2 files.
 Note: build failed on Fedora 43 with a compiler internal error (by
 definition a bug in the compiler).
 
-Tested OK on Ubuntu 24.04 LTS.  This will produce
-pico2_dsp_skeleton.uf2, the file you load onto the Pico2 using BOOTSEL
-via pressing the button while powering on (see Pico docs) or using
-picotool,
+Tested OK on Ubuntu 24.04 LTS.  This will produce ".uf2" files which
+you load onto the Pico2 using BOOTSEL via pressing the button while
+powering on (see Pico docs) or using picotool,
 
-    picotool load -f fir.uf2 -x
+    picotool load -f file.uf2 -x
