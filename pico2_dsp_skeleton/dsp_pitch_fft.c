@@ -111,17 +111,17 @@ static void compute_nsdf(float32_t *window)
   float32_t E_tau = E0;
 
   for (int tau = 0; tau < TAU_MAX; tau++) {
-    // 1. Sliding Window Energy O(1)
+    // Sliding Window Energy O(1)
     if (tau > 0) {
       float32_t drop = window[tau - 1];
       float32_t add = window[tau + WINDOW_SIZE - 1];
       E_tau = E_tau - (drop * drop) + (add * add);
     }
         
-    // 2. Extract ACF directly from the IFFT result
+    // Extract ACF directly from the IFFT result
     float32_t acf = acf_result[tau];
         
-    // 3. Algebraic reconstruction of the YIN difference
+    // Algebraic reconstruction of the YIN difference
     float32_t diff_sum = E0 + E_tau - (2.0f * acf);
         
     float32_t denom = E0 + E_tau;
@@ -186,7 +186,7 @@ static float32_t parabolic_interpolation(int tau_estimate)
   return (float32_t)tau_estimate + delta;
 }
 
-#define MEDIAN_FILTER_LEN 21
+#define MEDIAN_FILTER_LEN 11
 
 static float32_t apply_median_filter(float32_t new_val)
 {
@@ -209,7 +209,7 @@ static float32_t apply_median_filter(float32_t new_val)
     sorted[j + 1] = key;
   }
     
-  return sorted[MEDIAN_FILTER_LEN / 2];
+  return sorted[MEDIAN_FILTER_LEN/2];
 }
 
 static const char* note_names[] =

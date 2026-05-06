@@ -55,18 +55,18 @@ static void compute_nsdf(float32_t *window)
   float32_t E_tau = E0;
 
   for (int tau = 0; tau < TAU_MAX; tau++) {
-    // 1. Sliding Window Energy O(1)
+    // Sliding Window Energy O(1)
     if (tau > 0) {
       float32_t drop = window[tau - 1];
       float32_t add = window[tau + WINDOW_SIZE - 1];
       E_tau = E_tau - (drop * drop) + (add * add);
     }
         
-    // 2. Single Autocorrelation Pass O(N)
+    // Single Autocorrelation Pass O(N)
     float32_t acf = 0.0f;
     arm_dot_prod_f32(window, window + tau, WINDOW_SIZE, &acf);
         
-    // 3. Algebraic reconstruction of the YIN difference
+    // Algebraic reconstruction of the YIN difference
     float32_t diff_sum = E0 + E_tau - (2.0f * acf);
         
     float32_t denom = E0 + E_tau;
@@ -141,19 +141,21 @@ static float32_t parabolic_interpolation(int tau_estimate)
   return (float32_t)tau_estimate + delta;
 }
 
+#define MEDIAN_FILTER_LEN 11
+
 static float32_t apply_median_filter(float32_t new_val)
 {
-  static float32_t history[5] = {0};
+  static float32_t history[MEDIAN_FILTER_LEN] = {0};
   static int idx = 0;
     
   history[idx] = new_val;
-  idx = (idx + 1) % 5;
+  idx = (idx + 1) % MEDIAN_FILTER_LEN;
     
-  float32_t sorted[5];
+  float32_t sorted[MEDIAN_FILTER_LEN];
   memcpy(sorted, history, sizeof(sorted));
     
-  // Insertion sort for 5 elements
-  for (int i = 1; i < 5; i++) {
+  // Insertion sort for MEDIAN_FILTER_LEN elements
+  for (int i = 1; i < MEDIAN_FILTER_LEN; i++) {
     float32_t key = sorted[i];
     int j = i - 1;
     while (j >= 0 && sorted[j] > key) {
@@ -163,7 +165,7 @@ static float32_t apply_median_filter(float32_t new_val)
     sorted[j + 1] = key;
   }
     
-  return sorted[2];
+  return sorted[MEDIAN_FILTER_LEN/2];
 }
 
 static const char* note_names[] =
@@ -226,7 +228,7 @@ static void core1_main(void)
       detected_freq = 0.0f;
     }
         
-    // Apply 5-frame median filter to completely obliterate instantaneous
+    // Apply MEDIAN_FILTER_LEN-frame median filter to completely obliterate instantaneous
     // octave/subharmonic glitches
     detected_freq = apply_median_filter(detected_freq);
 

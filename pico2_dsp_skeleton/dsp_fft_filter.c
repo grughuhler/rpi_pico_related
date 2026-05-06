@@ -78,25 +78,25 @@ void process_buf_dsp(q31_t *buf)
   float32_t float_in[BLOCK_SIZE];
   float32_t float_out[BLOCK_SIZE];
 
-  // 1. Convert fixed-point input to float
+  // Convert fixed-point input to float
   buf_left_to_float(buf, float_in);
 
-  // 2. Overlap-Save: Shift history buffer left by BLOCK_SIZE
-  // We move the last (FFT_SIZE - BLOCK_SIZE) samples to the beginning.
+  // Overlap-Save: Shift history buffer left by BLOCK_SIZE
+  // Move the last (FFT_SIZE - BLOCK_SIZE) samples to the beginning.
   memmove(history_buffer, &history_buffer[BLOCK_SIZE], 
 	  (FFT_SIZE - BLOCK_SIZE) * sizeof(float32_t));
 
-  // 3. Append new samples to the end of the history buffer
+  // Append new samples to the end of the history buffer
   memcpy(&history_buffer[FFT_SIZE - BLOCK_SIZE], float_in, 
 	 BLOCK_SIZE * sizeof(float32_t));
 
-  // 4. Compute Forward FFT of the history buffer
+  // Compute Forward FFT of the history buffer
   // IMPORTANT: arm_rfft_fast_f32 modifies the input buffer in-place!
   // Must copy history_buffer to a temporary buffer before the FFT.
   memcpy(ifft_output, history_buffer, FFT_SIZE * sizeof(float32_t));
   arm_rfft_fast_f32(&fft_inst, ifft_output, fft_work_buffer, 0);
 
-  // 5. Complex Multiplication in frequency domain
+  // Complex Multiplication in frequency domain
   // DC bin (real only)
   fft_work_buffer[0] = fft_work_buffer[0] * filter_H[0];
   // Nyquist bin (real only)
@@ -105,16 +105,16 @@ void process_buf_dsp(q31_t *buf)
   arm_cmplx_mult_cmplx_f32(&fft_work_buffer[2], &filter_H[2],
 			   &fft_work_buffer[2], CMPLX_BINS - 1);
 
-  // 6. Compute Inverse FFT
+  // Compute Inverse FFT
   arm_rfft_fast_f32(&fft_inst, fft_work_buffer, ifft_output, 1);
 
-  // 7. Extract the valid output samples
+  // Extract the valid output samples
   // In Overlap-Save, the first (NUM_TAPS - 1) samples of the IFFT output 
   // are corrupted by circular aliasing. The valid samples are the LAST 
   // BLOCK_SIZE samples, starting at index (FFT_SIZE - BLOCK_SIZE).
   memcpy(float_out, &ifft_output[FFT_SIZE - BLOCK_SIZE], 
 	 BLOCK_SIZE * sizeof(float32_t));
 
-  // 8. Convert float output back to fixed-point
+  // Convert float output back to fixed-point
   float_to_buf_left(float_out, buf);
 }
