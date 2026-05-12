@@ -15,7 +15,8 @@
 #include <stdio.h>
 #include <string.h>
 
-/* FFT size must be a power of 2 between BLOCK_SIZE and 4096 inclusive */
+// FFT size must be a power of 2 between 64 and 4096 inclusive
+// Also, I think FFT_SIZE must be evenly divisible by BLOCK_SIZE
 #define FFT_SIZE 4096
 #if ((FFT_SIZE > 4096) || (FFT_SIZE < 64))
 #error "CMSIS_DSP FFT size out of range"

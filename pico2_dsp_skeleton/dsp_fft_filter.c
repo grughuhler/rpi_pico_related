@@ -57,15 +57,9 @@ static float32_t ifft_output[FFT_SIZE];
 
 void init_dsp(void)
 {
-  // Initialize the RFFT instance
   arm_rfft_fast_init_f32(&fft_inst, FFT_SIZE);
 
-  // Prepare the filter impulse response in the time domain
-  // Zero out the work buffer first
   memset(fft_work_buffer, 0, sizeof(fft_work_buffer));
-
-  // Copy the time-domain coefficients into the work buffer.
-  // NUM_TAPS is defined in fft_filter_coeffs.h (should be 449)
   memcpy(fft_work_buffer, fir_coeffs, NUM_TAPS * sizeof(float32_t));
 
   // Compute the forward FFT of the zero-padded impulse response
@@ -78,7 +72,6 @@ void process_buf_dsp(q31_t *buf)
   float32_t float_in[BLOCK_SIZE];
   float32_t float_out[BLOCK_SIZE];
 
-  // Convert fixed-point input to float
   buf_left_to_float(buf, float_in);
 
   // Overlap-Save: Shift history buffer left by BLOCK_SIZE
@@ -91,16 +84,13 @@ void process_buf_dsp(q31_t *buf)
 	 BLOCK_SIZE * sizeof(float32_t));
 
   // Compute Forward FFT of the history buffer
-  // IMPORTANT: arm_rfft_fast_f32 modifies the input buffer in-place!
   // Must copy history_buffer to a temporary buffer before the FFT.
   memcpy(ifft_output, history_buffer, FFT_SIZE * sizeof(float32_t));
   arm_rfft_fast_f32(&fft_inst, ifft_output, fft_work_buffer, 0);
 
   // Complex Multiplication in frequency domain
-  // DC bin (real only)
-  fft_work_buffer[0] = fft_work_buffer[0] * filter_H[0];
-  // Nyquist bin (real only)
-  fft_work_buffer[1] = fft_work_buffer[1] * filter_H[1];
+  fft_work_buffer[0] = fft_work_buffer[0] * filter_H[0];  // DC bin (real)
+  fft_work_buffer[1] = fft_work_buffer[1] * filter_H[1]; // Nyquist bin )real)
   // Remaining bins (complex)
   arm_cmplx_mult_cmplx_f32(&fft_work_buffer[2], &filter_H[2],
 			   &fft_work_buffer[2], CMPLX_BINS - 1);
@@ -115,6 +105,5 @@ void process_buf_dsp(q31_t *buf)
   memcpy(float_out, &ifft_output[FFT_SIZE - BLOCK_SIZE], 
 	 BLOCK_SIZE * sizeof(float32_t));
 
-  // Convert float output back to fixed-point
   float_to_buf_left(float_out, buf);
 }

@@ -17,13 +17,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifndef WINDOW_SIZE
+// Be careful changing BLOCK_SIZE.  It might have to evenly divide
+// BUFFER_SIZE or something.
 #define WINDOW_SIZE 704
-#endif
-
-#ifndef MAX_TAU
 #define MAX_TAU WINDOW_SIZE
-#endif
 
 #define BUFFER_SIZE (WINDOW_SIZE + MAX_TAU)
 
@@ -290,7 +287,7 @@ static void core1_main(void)
         float32_t cents_diff = 1200.0f *
           fabsf(log2f(detected_freq / last_printed_freq));
  
-        if (cents_diff >= 2.0f) {
+        if (cents_diff >= 0.05f) {
           should_print = true;
         }
       }

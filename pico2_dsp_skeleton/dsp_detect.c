@@ -9,8 +9,8 @@
  */
 
 /* This file implements a tone detector using a Goertzel detector.
- * The Pico2's LED will light when the tone is detected.  The frequency
- * of the tone to detect is hard-coded below.
+ * The Pico2's LED will light when the tone is detected.  The
+ * frequency of the tone to detect is hard-coded below.
  */
 
 #define FREQ_TO_DETECT 2000.0f
@@ -29,7 +29,8 @@ typedef struct {
 
 static GoertzelDetector detector;
 
-static void __attribute__ ((noinline)) init_goertzel(GoertzelDetector *S, float32_t target_f) {
+static void init_goertzel(GoertzelDetector *S, float32_t target_f)
+{
   double omega = (2.0 * PI_D * (double) target_f) / (double) SAMPLE_RATE;
   S->coeff = 2.0 * cos(omega);
     
@@ -38,9 +39,13 @@ static void __attribute__ ((noinline)) init_goertzel(GoertzelDetector *S, float3
 
   if (ideal_samples < BLOCK_SIZE) ideal_samples = BLOCK_SIZE;
 
-  S->samples_needed = ((ideal_samples + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
-  S->v1 = 0; S->v2 = 0; S->total_energy = 0; S->samples_processed = 0;
-  S->dc_prev_in = 0; S->dc_prev_out = 0;
+  S->samples_needed =
+    ((ideal_samples + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
+
+  S->v1 = 0; S->v2 = 0; S->total_energy = 0;
+  S->samples_processed = 0;
+  S->dc_prev_in = 0;
+  S->dc_prev_out = 0;
   S->ready = false;
 }
 
@@ -57,7 +62,9 @@ static void goertzel_update(GoertzelDetector *S, float32_t *pSrc) {
   const float32_t alpha = 0.99f; // DC Blocker coefficient
 
   for (uint32_t i = 0; i < BLOCK_SIZE; i++) {
-    float32_t clean_sample = pSrc[i] - S->dc_prev_in + (alpha * S->dc_prev_out);
+    float32_t clean_sample =
+      pSrc[i] - S->dc_prev_in + (alpha * S->dc_prev_out);
+
     S->dc_prev_in = pSrc[i];
     S->dc_prev_out = clean_sample;
 
@@ -82,7 +89,9 @@ static void goertzel_update(GoertzelDetector *S, float32_t *pSrc) {
     }
 
     S->ready = true;
-    S->v1 = 0; S->v2 = 0; S->total_energy = 0; S->samples_processed = 0;
+    S->v1 = 0; S->v2 = 0;
+    S->total_energy = 0;
+    S->samples_processed = 0;
   } else {
     S->ready = false;
   }

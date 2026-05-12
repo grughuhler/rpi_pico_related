@@ -34,15 +34,22 @@
 
 #define NUM_BUFFERS 3
 
-// BLOCK_SIZE is the number of samples per buffer in the triple DMA.
-// It will always be SAMPLES_PER_BUFFER/2 since SAMPLES_PER_BUFFER
-// is the number of stereo samples per buffer.  BLOCK_SIZE indirectly
-// determines software's realtime deadline per buffer.  Software has
-// BLOCK_SIZE/SAMPLE_RATE seconds in which it must process a buffer.
-// In theory, you can change BLOCK_SIZE (by changing SAMPLES_PER_BUFFER),
-// but this is not very well tested.  Change with caution.
-#define SAMPLES_PER_BUFFER 128
-#define BLOCK_SIZE (SAMPLES_PER_BUFFER / 2)
+// BLOCK_SIZE is the number of MONOPHONIC samples per buffer in the
+// triple DMA.  Since processing tends to be per-channel, this is
+// the processing block size.  For example, there are BLOCK_SIZE
+// samples per buffer for the LEFT channel.
+//
+// But the i2s devices are stereo.  There are two channels.  This
+// means that there are 2*BLOCK_SIZE total samples per buffer.  This
+// is the size that DMAs need to move data for both channels.
+//
+// BLOCK_SIZE indirectly determines software's realtime deadline per
+// buffer.  Software has BLOCK_SIZE/SAMPLE_RATE seconds in which it
+// must process a buffer.  In theory, you can change BLOCK_SIZE (by
+// changing SAMPLES_PER_BUFFER), but this is not very well tested.
+// Change with caution.
+#define BLOCK_SIZE 64
+#define SAMPLES_PER_BUFFER (2*BLOCK_SIZE)
 
 // Use the vcvt instruction to convert between fixed point and float32.
 // bits must be a constant.

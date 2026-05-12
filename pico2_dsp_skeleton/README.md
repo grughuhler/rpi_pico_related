@@ -4,16 +4,17 @@ This program is a real-time Audio DSP framework built using the RP2350
 (Raspberry Pi Pico 2). It uses PIO to implement 4-wire (send and
 receive) i2s.  PIO also implements all needed clocks using side sets.
 
-It is presented in YouTube video: https://youtu.be/IiyGa5ss1Dw
+It is presented in YouTube videos: XXXXXXX
+and https://youtu.be/IiyGa5ss1Dw
 
 It uses ARM's CMSIS_DSP library.
 
-NOTE: This README is describing a later version of the software than
-shown in the video.  The code is reorganized and now supports FIR and
-IIR filters and more.
+NOTE: This README is describing the current version of the software
+shown in the latest video.  The code is reorganized and now supports
+FIR and IIR filters and more.
 
-Git tag video_pico2_dsp_skeleton refers to the older version, but it's
-best to use the latest version.
+Git tag video_pico2_dsp_skeleton refers to the version from the first
+video, but it's best to use the latest version.
 
 A PCM1808 i2s ADC provides input data and a PCM5102A i2s DAC converts
 samples back to analog for output.

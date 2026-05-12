@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <string.h>
 
+// Be careful changing BLOCK_SIZE.  It might have to evenly divide
+// WINDOW_SIZE or something.
 #define WINDOW_SIZE 704
 #define MAX_TAU 704
 #define BUFFER_SIZE (WINDOW_SIZE + MAX_TAU) // 1408
