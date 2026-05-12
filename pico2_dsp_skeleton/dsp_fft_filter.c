@@ -39,6 +39,18 @@
 
 /* FFT_SIZE must be a power of two so choose NUM_TAPS accordingly */
 #define FFT_SIZE (NUM_TAPS + BLOCK_SIZE - 1)
+
+/* Check if NUM_TAPS consistent with BLOCK_SIZE */
+#if ((BLOCK_SIZE == 32) && (NUM_TAPS != 481))
+#error "Try 481 taps with BLOCK_SIZE 32"
+#elif ((BLOCK_SIZE == 64) && (NUM_TAPS != 961))
+#error "Try 961 taps with BLOCK_SIZE 64"
+#elif ((BLOCK_SIZE == 192) && (NUM_TAPS != 1857))
+#error "Try 1857 taps with BLOCK_SIZE 192"
+#elif ((BLOCK_SIZE == 384) && (NUM_TAPS != 3713))
+#error "Try 3713 taps with BLOCK_SIZE 384"
+#endif
+
 #define CMPLX_BINS (FFT_SIZE / 2)
 
 static arm_rfft_fast_instance_f32 fft_inst;

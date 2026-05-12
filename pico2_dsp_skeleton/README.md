@@ -4,7 +4,7 @@ This program is a real-time Audio DSP framework built using the RP2350
 (Raspberry Pi Pico 2). It uses PIO to implement 4-wire (send and
 receive) i2s.  PIO also implements all needed clocks using side sets.
 
-It is presented in YouTube videos: XXXXXXX
+It is presented in YouTube videos: https://youtu.be/R24kLI5O0y0
 and https://youtu.be/IiyGa5ss1Dw
 
 It uses ARM's CMSIS_DSP library.
@@ -45,7 +45,9 @@ dsp_fft_filter.c implements with FIR filter with coefficients from
 fft_filter_coeffs.h using FFT convolution.  This allows a somewhat
 larger FIR filter to be done within realtime constraints that stem
 from a 64 sample block size.  See the file for constraints on the
-number of taps allowed.  The left channel is filtered.
+number of taps allowed.  The left channel is filtered.  NOTE: With
+the default BLOCK_SIZE of 64, you can do a 961 tap filter.  Change
+BLOCK_SIZE in dsp_common.h to 384 to do a 3713 tap filter.
 
 dsp_iir.c implements the IIR filter with coefficient from iir_coeffs.h
 and applies it to the left channel.
