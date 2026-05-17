@@ -9,12 +9,15 @@ and https://youtu.be/IiyGa5ss1Dw
 
 It uses ARM's CMSIS_DSP library.
 
-NOTE: This README is describing the current version of the software
-shown in the latest video.  The code is reorganized and now supports
-FIR and IIR filters and more.
+Note: This README describes the latest version of this software, a
+version that may be more recent than any YouTube video.  It may be
+best to use this version, but there are tags associated with the
+software state that matches video releases.
 
-Git tag video_pico2_dsp_skeleton refers to the version from the first
-video, but it's best to use the latest version.
+Git Tags:
+
+video_pico2_dsp_apps matches https://youtu.be/R24kLI5O0y0
+video_pico2_dsp_skeleton matches https://youtu.be/IiyGa5ss1Dw
 
 A PCM1808 i2s ADC provides input data and a PCM5102A i2s DAC converts
 samples back to analog for output.
@@ -76,6 +79,17 @@ and uses core 1 for the algorithm.
 
 dsp_pitch_fft.c is basically the same as dsp_pitch.c but uses FFTs
 to speed the computation rather like dsp_fft_filter.c
+
+dsp_hilbert_fir.c is a time-domain FIR-based Hilbert transform.
+Hilbert transforms create an output that is 90 degrees phased shifted
+from the input (which may need a delay to align).  It is a kind of
+all-pass filter.  Script gen_hilbert_fir.py generates coefficients
+based on the desired number of taps.
+
+dsp_hilbert_iir.c is an IIR based Hilbert transform.
+
+dsp_qmix.c demonstrates a digital quadrature mixer using an IIR-based
+Hilbert transform.
 
 ## Generating Filter Coefficients
 

@@ -58,13 +58,15 @@
 
 #define FAST_FIXED_TO_FLOAT(x, bits) ({ \
     float32_t __result; \
-    __asm__ ("vcvt.f32.s32 %0, %1, #" #bits : "=t" (__result) : "t" (x)); \
+    int32_t __tmp = (x); \
+    __asm__ ("vcvt.f32.s32 %0, %1, #" #bits : "=t" (__result) : "0" (__tmp)); \
     __result; \
 })
 
 #define FAST_FLOAT_TO_FIXED(x, bits) ({ \
     int32_t __result; \
-    __asm__ ("vcvt.s32.f32 %0, %1, #" #bits : "=t" (__result) : "t" (x)); \
+    float32_t __tmp = (x); \
+    __asm__ ("vcvt.s32.f32 %0, %1, #" #bits : "=t" (__result) : "0" (__tmp)); \
     __result; \
 })
 
