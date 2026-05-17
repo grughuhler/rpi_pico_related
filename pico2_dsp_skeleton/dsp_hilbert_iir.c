@@ -10,22 +10,26 @@
  */
 
 #include "dsp_common.h"
-#define NUM_STAGES_PATH1 3
-#define NUM_STAGES_PATH2 3
+#define NUM_STAGES_PATH1 5
+#define NUM_STAGES_PATH2 5
 
-// Optimized coefficients for Fs = 48828.125 Hz Guaranteed to yield <
-// 2.5 degrees of phase error between 40 Hz and 16 kHz.
+// Optimized coefficients for Fs = 48828.125 Hz should yield < 0.24
+// degrees of phase error between 40 Hz and 16 kHz.
 float32_t iir_path1_coeffs[NUM_STAGES_PATH1 * 5] = {
-      0.210668f, 0.0f, -1.0f, 0.0f,   0.210668f,
-      0.829548f, 0.0f, -1.0f, 0.0f,   0.829548f,
-      0.977870f, 0.0f, -1.0f, 0.0f,   0.977870f,
+  0.091128f, 0.0f, -1.0f, 0.0f,   0.091128f,
+  0.539201f, 0.0f, -1.0f, 0.0f,   0.539201f,
+  0.839705f, 0.0f, -1.0f, 0.0f,   0.839705f,
+  0.952009f, 0.0f, -1.0f, 0.0f,   0.952009f,
+  0.988099f, 0.0f, -1.0f, 0.0f,   0.988099f,
 };
 float32_t iir_path1_state[NUM_STAGES_PATH1 * 4] = {0};
 
 float32_t iir_path2_coeffs[NUM_STAGES_PATH2 * 5] = {
-      0.587919f, 0.0f, -1.0f, 0.0f,   0.587919f,
-      0.936259f, 0.0f, -1.0f, 0.0f,   0.936259f,
-      0.994548f, 0.0f, -1.0f, 0.0f,   0.994548f,
+  0.307112f, 0.0f, -1.0f, 0.0f,   0.307112f,
+  0.720435f, 0.0f, -1.0f, 0.0f,   0.720435f,
+  0.911190f, 0.0f, -1.0f, 0.0f,   0.911190f,
+  0.974934f, 0.0f, -1.0f, 0.0f,   0.974934f,
+  0.996503f, 0.0f, -1.0f, 0.0f,   0.996503f,
 };
 float32_t iir_path2_state[NUM_STAGES_PATH2 * 4] = {0};
 

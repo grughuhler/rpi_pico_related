@@ -13,22 +13,24 @@
 
 #define LO_FREQ 1000.0f
 
-#define NUM_STAGES_I_PATH 3
-#define NUM_STAGES_Q_PATH 3
+#define NUM_STAGES_I_PATH 4
+#define NUM_STAGES_Q_PATH 4
 
-// Optimized coefficients for Fs = 48828.125 Hz Guaranteed to yield <
-// 2.5 degrees of phase error between 40 Hz and 16 kHz.
+// Optimized coefficients for Fs = 48828.125 Hz should yield < 0.96
+// degrees of phase error between 40 Hz and 16 kHz.
 float32_t iir_i_path_coeffs[NUM_STAGES_I_PATH * 5] = {
-      0.210668f, 0.0f, -1.0f, 0.0f,   0.210668f,
-      0.829548f, 0.0f, -1.0f, 0.0f,   0.829548f,
-      0.977870f, 0.0f, -1.0f, 0.0f,   0.977870f,
+  0.133859f, 0.0f, -1.0f, 0.0f,   0.133859f,
+  0.671647f, 0.0f, -1.0f, 0.0f,   0.671647f,
+  0.919229f, 0.0f, -1.0f, 0.0f,   0.919229f,
+  0.983961f, 0.0f, -1.0f, 0.0f,   0.983961f,
 };
 float32_t iir_i_path_state[NUM_STAGES_I_PATH * 4] = {0};
 
 float32_t iir_q_path_coeffs[NUM_STAGES_Q_PATH * 5] = {
-      0.587919f, 0.0f, -1.0f, 0.0f,   0.587919f,
-      0.936259f, 0.0f, -1.0f, 0.0f,   0.936259f,
-      0.994548f, 0.0f, -1.0f, 0.0f,   0.994548f,
+  0.417817f, 0.0f, -1.0f, 0.0f,   0.417817f,
+  0.832612f, 0.0f, -1.0f, 0.0f,   0.832612f,
+  0.962541f, 0.0f, -1.0f, 0.0f,   0.962541f,
+  0.995573f, 0.0f, -1.0f, 0.0f,   0.995573f,
 };
 float32_t iir_q_path_state[NUM_STAGES_Q_PATH * 4] = {0};
 
@@ -59,7 +61,7 @@ void process_buf_dsp(q31_t *buf)
   float32_t float_in_delayed[BLOCK_SIZE];
   float32_t lo_hz = LO_FREQ, lo, lo90, qmix_out, mix_out;
   float32_t phase_lo_incr = 2.0f * PI_F * lo_hz / SAMPLE_RATE;
-  static float32_t phase_lo = 0.0f, phase_lo90 = PI_F/2.0f;
+  static float32_t phase_lo = 0.0f;
   
 
   // Extract mono left channel from interleaved fixed-point buffer
@@ -82,17 +84,14 @@ void process_buf_dsp(q31_t *buf)
   for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
     // Compute LO and LO90 samples
     lo = arm_sin_f32(phase_lo);
+    lo90 = arm_cos_f32(phase_lo);
     phase_lo += phase_lo_incr;
     if (phase_lo > 2.0f * PI_F) phase_lo -= 2.0f * PI_F;
-
-    lo90 = arm_sin_f32(phase_lo90);
-    phase_lo90 += phase_lo_incr;
-    if (phase_lo90 > 2.0f * PI_F) phase_lo90 -= 2.0f * PI_F;
 
     // Quadrature mixer output on left channel
     qmix_out = lo*float_out_i_path[j] + lo90*float_out_q_path[j];
     qmix_out *= 0.8f;
-    buf[i]   = FAST_FLOAT_TO_FIXED(qmix_out, 31);
+    buf[i] = FAST_FLOAT_TO_FIXED(qmix_out, 31);
 
     // Regular mixer output on right channel
     mix_out = lo*float_out_i_path[j];
