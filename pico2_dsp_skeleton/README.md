@@ -91,6 +91,10 @@ dsp_hilbert_iir.c is an IIR based Hilbert transform.
 dsp_qmix.c demonstrates a digital quadrature mixer using an IIR-based
 Hilbert transform.
 
+dsp_voice_alter.c changes the pitch of a voice signal using a ratio
+set in the code.  This preserves harmonic ratios to make the changed
+voice sound a bit more natural.
+
 ## Generating Filter Coefficients
 
 Files gen_fir_firwin.py, gen_fir_firwin2.py, and gen_iir.py are python
