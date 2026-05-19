@@ -55,11 +55,16 @@ static float32_t history_buffer[FFT_SIZE] = {0};
 static float32_t fft_work_buffer[FFT_SIZE];
 static float32_t ifft_output[FFT_SIZE];
 
-void init_dsp(void) {
+void init_dsp(void)
+{
   arm_rfft_fast_init_f32(&fft_inst, FFT_SIZE);
 
   memset(fft_work_buffer, 0, sizeof(fft_work_buffer));
-  memcpy(fft_work_buffer, hilbert_coeffs, NUM_TAPS * sizeof(float32_t));
+  // The coefficients in the header are time-reversed for arm_fir_f32.
+  // We must un-reverse them here for correct FFT convolution phase!
+  for (int i = 0; i < NUM_TAPS; i++) {
+    fft_work_buffer[i] = hilbert_coeffs[NUM_TAPS - 1 - i];
+  }
 
   // Compute the forward FFT of the zero-padded impulse response
   // to get the frequency domain coefficients (H[k])
@@ -74,8 +79,8 @@ void init_dsp(void) {
 void process_buf_dsp(q31_t *buf)
 {
   float32_t float_in_left[BLOCK_SIZE];
-  float32_t float_out_left[BLOCK_SIZE];
-  float32_t float_out_right[BLOCK_SIZE];
+  float32_t float_out_in_phase[BLOCK_SIZE];
+  float32_t float_out_quadrature[BLOCK_SIZE];
 
   // Extract the left channel
   buf_left_to_float(buf, float_in_left);
@@ -107,14 +112,14 @@ void process_buf_dsp(q31_t *buf)
   // Extract the valid output samples
   // In Overlap-Save, the valid samples are the LAST BLOCK_SIZE samples,
   // starting at index (FFT_SIZE - BLOCK_SIZE).
-  memcpy(float_out_left, &ifft_output[FFT_SIZE - BLOCK_SIZE],
+  memcpy(float_out_quadrature, &ifft_output[FFT_SIZE - BLOCK_SIZE],
          BLOCK_SIZE * sizeof(float32_t));
 
   // The output of the FIR filter has a group delay of DELAY_SAMPLES.
-  // We need to delay the original left channel by the same amount
-  // to output it on the right channel in perfect quadrature.
+  // We need to delay the original input channel by the same amount
+  // to output it on the in_phase channel.
   for (int i = 0; i < BLOCK_SIZE; i++) {
-    float_out_right[i] = delay_buffer[delay_idx];
+    float_out_in_phase[i] = delay_buffer[delay_idx];
     delay_buffer[delay_idx] = float_in_left[i];
     delay_idx++;
     if (delay_idx >= DELAY_SAMPLES) {
@@ -122,10 +127,11 @@ void process_buf_dsp(q31_t *buf)
     }
   }
 
-  // Write outputs back to the interleaved fixed-point buffer.
-  // buf[i] is left channel (transformed), buf[i+1] is right channel (delayed).
+  // Write outputs back to the interleaved fixed-point buffer.  buf[i]
+  // is quadrature channel (transformed), buf[i+1] is in_phase channel
+  // (delayed).
   for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
-    buf[i] = FAST_FLOAT_TO_FIXED(float_out_left[j], 31);
-    buf[i + 1] = FAST_FLOAT_TO_FIXED(float_out_right[j], 31);
+    buf[i] = FAST_FLOAT_TO_FIXED(float_out_quadrature[j], 31);
+    buf[i + 1] = FAST_FLOAT_TO_FIXED(float_out_in_phase[j], 31);
   }
 }
