@@ -122,32 +122,32 @@ void process_buf_dsp(q31_t *buf)
   float32_t delay_rate = 1.0f - PITCH_SHIFT_RATIO;
     
   for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
-    // 1. Write incoming filtered sample to circular buffer
+    // Write incoming filtered sample to circular buffer
     delay_buffer[write_ptr] = float_filtered[j];
         
-    // 2. Read from the two delay taps using cubic interpolation
+    // Read from the two delay taps using cubic interpolation
     float32_t val1 = read_delay_interp(delay1);
     float32_t val2 = read_delay_interp(delay2);
         
-    // 3. Calculate crossfade weights (triangle window)
+    // Calculate crossfade weights (triangle window)
     float32_t w1 = get_window_weight(delay1);
     float32_t w2 = get_window_weight(delay2);
         
-    // 4. Mix the two overlapping windows
+    // Mix the two overlapping windows
     float32_t out = (val1 * w1) + (val2 * w2);
         
-    // 5. Output mixed audio to both left and right channels
+    // Output mixed audio to both left and right channels
     buf[i]   = FAST_FLOAT_TO_FIXED(out, 31);
     //    buf[i+1] = buf[i];
         
-    // 6. Advance write pointer circularly
+    // Advance write pointer circularly
     write_ptr = (write_ptr + 1) & DELAY_BUFFER_MASK;
         
-    // 7. Advance read pointer delays
+    // Advance read pointer delays
     delay1 += delay_rate;
     delay2 += delay_rate;
         
-    // 8. Safely wrap delays if they reach the ends of the window bounds
+    // Wrap delays if they reach the ends of the window bounds
     if (delay1 < SAFE_ZONE) delay1 += WINDOW_LENGTH;
     else if (delay1 >= (SAFE_ZONE + WINDOW_LENGTH)) delay1 -= WINDOW_LENGTH;
     

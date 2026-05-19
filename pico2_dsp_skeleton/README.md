@@ -86,12 +86,18 @@ from the input (which may need a delay to align).  It is a kind of
 all-pass filter.  Script gen_hilbert_fir.py generates coefficients
 based on the desired number of taps.
 
+dsp_hilbert_fir_fft.c is a frequency-domain FIR-based Hilbert
+transform.  It uses FFT convolution to increase efficieny with large
+numbers of taps.  Script gen_hilbert_fir.py generates coefficients
+based on the desired number of taps.  Use 961 taps when BLOCK_SIZE is
+64.
+
 dsp_hilbert_iir.c is an IIR based Hilbert transform.
 
 dsp_qmix.c demonstrates a digital quadrature mixer using an IIR-based
 Hilbert transform.
 
-dsp_voice_alter.c changes the pitch of a voice signal using a ratio
+dsp_voice_change.c changes the pitch of a voice signal using a ratio
 set in the code.  This preserves harmonic ratios to make the changed
 voice sound a bit more natural.
 

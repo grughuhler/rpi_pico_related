@@ -5,13 +5,25 @@
  * specification, fixes, and testing.
  */
 
-/* This file implements an IIR Hilbert Phase-Splitting network
- * using highly optimized coefficients for a 48828.125 Hz sample rate.
+/* This file inputs a signal from the left channel and mixes it with
+ * an "LO" sine wave using a quadrature mixer.  Set LO_FREQ below. For
+ * this to work the input signal must be passed through a Hilbert
+ * transform.  Basically, this is SSB modulation with I and Q coming
+ * from the Hilbert transform.  The output (left channel) is the input
+ * frequency shifted by LO_FREQ.
+ *
+ * The Hilbert transform is implemented via an IIR phase-splitting
+ * network.
+ *
+ * The right channel output is the input mixed with LO using a
+ * non-quadrature mixer.
+ *
+ * The results are best seen using a spectrum analyzer.
  */
 
 #include "dsp_common.h"
 
-#define LO_FREQ 1000.0f
+#define LO_FREQ 3000.0f
 
 #define NUM_STAGES_I_PATH 4
 #define NUM_STAGES_Q_PATH 4
@@ -88,7 +100,8 @@ void process_buf_dsp(q31_t *buf)
     phase_lo += phase_lo_incr;
     if (phase_lo > 2.0f * PI_F) phase_lo -= 2.0f * PI_F;
 
-    // Quadrature mixer output on left channel
+    // Quadrature mixer output on left channel.  Use addition for
+    // SSB-USB or subtraction for LSB.
     qmix_out = lo*float_out_i_path[j] + lo90*float_out_q_path[j];
     qmix_out *= 0.8f;
     buf[i] = FAST_FLOAT_TO_FIXED(qmix_out, 31);

@@ -5,8 +5,9 @@
  * specification, fixes, and testing.
  */
 
-/* This file implements a Hilbert transform using coefficients from
- * hilbert_coeffs.h which can be generated using gen_hilbert.py.
+/* This file implements a Hilbert transform using an FIR with
+ * coefficients from hilbert_coeffs.h which can be generated using
+ * gen_hilbert_fir.py.
  */
 
 #include "dsp_common.h"
@@ -55,10 +56,24 @@ void process_buf_dsp(q31_t *buf)
     }
   }
 
-  // Write outputs back to the interleaved fixed-point buffer.
-  // buf[i] is left channel (transformed), buf[i+1] is right channel (delayed).
+#define HILBERT_OUT
+#ifdef HILBERT_OUT
+  // Write outputs back to the interleaved fixed-point buffer. buf[i]
+  // is left channel (transformed), buf[i+1] is right channel
+  // (appropriately delayed).
   for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
     buf[i] = FAST_FLOAT_TO_FIXED(float_out_left[j], 31);
     buf[i+1] = FAST_FLOAT_TO_FIXED(float_out_right[j], 31);
   }
+#else
+  // Output envelope on left channel, raw input signal on right.
+  // Hint: Use non-carrier-suppressed AM as input signal
+  for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
+    buf[i+1] = FAST_FLOAT_TO_FIXED(float_out_left[j], 31);
+    float32_t sout, sin = float_out_left[j]*float_out_left[j] +
+      float_out_right[j]*float_out_right[j];
+    arm_sqrt_f32(sin, &sout);
+    buf[i] = FAST_FLOAT_TO_FIXED(sout, 31);
+  }
+#endif
 }

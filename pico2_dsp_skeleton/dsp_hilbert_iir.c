@@ -5,8 +5,9 @@
  * specification, fixes, and testing.
  */
 
-/* This file implements an IIR Hilbert Phase-Splitting network
- * using highly optimized coefficients for a 48828.125 Hz sample rate.
+/* This file implements the Hilbert transform using an IIR Phase
+ * Splitting network with coefficients optimized for a 48828.125 Hz
+ * sample rate.
  */
 
 #include "dsp_common.h"
@@ -76,6 +77,8 @@ void process_buf_dsp(q31_t *buf)
   arm_biquad_cascade_df1_f32(&iir_path2, float_in_delayed, float_out_path2,
                              BLOCK_SIZE);
 
+#define HILBERT_OUT
+#ifdef HILBERT_OUT
   // Re-interleave the two paths back into the audio buffer.
   // The output of Path 1 (Left) and Path 2 (Right) will have
   // a 90-degree phase difference.
@@ -83,4 +86,15 @@ void process_buf_dsp(q31_t *buf)
     buf[i]   = FAST_FLOAT_TO_FIXED(float_out_path1[j], 31);
     buf[i+1] = FAST_FLOAT_TO_FIXED(float_out_path2[j], 31);
   }
+#else
+  // Output envelope on left channel, raw input signal on right.
+  // Hint: Use non-carrier-suppressed AM as input signal
+  for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
+    buf[i+1] = FAST_FLOAT_TO_FIXED(float_out_path1[j], 31);
+    float32_t sout, sin = float_out_path1[j]*float_out_path1[j] +
+      float_out_path2[j]*float_out_path2[j];
+    arm_sqrt_f32(sin, &sout);
+    buf[i] = FAST_FLOAT_TO_FIXED(sout, 31);
+  }
+#endif
 }
