@@ -67,14 +67,14 @@ void process_buf_dsp(q31_t *buf)
     buf[i+1] = FAST_FLOAT_TO_FIXED(float_out_in_phase[j], 31);
   }
 #else
-  // Output envelope on left channel, raw input signal on left.
+  // Output envelope on left channel, quadrature signal on left.
   // Hint: Use non-carrier-suppressed AM as input signal
   for (int i = 0, j = 0; i < SAMPLES_PER_BUFFER; i += 2, j++) {
+    float32_t env, env2;
     buf[i+1] = FAST_FLOAT_TO_FIXED(float_out_quadrature[j], 31);
-    float32_t sout, sin = float_out_quadrature[j]*float_out_quadrature[j] +
-      float_out_in_phase[j]*float_out_in_phase[j];
-    arm_sqrt_f32(sin, &sout);
-    buf[i] = FAST_FLOAT_TO_FIXED(sout, 31);
+    env2 = powf(float_out_quadrature[j], 2) + powf(float_out_in_phase[j], 2);
+    arm_sqrt_f32(env2, &env);
+    buf[i] = FAST_FLOAT_TO_FIXED(env, 31);
   }
 #endif
 }

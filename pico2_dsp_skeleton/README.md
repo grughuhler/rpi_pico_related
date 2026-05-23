@@ -4,8 +4,10 @@ This program is a real-time Audio DSP framework built using the RP2350
 (Raspberry Pi Pico 2). It uses PIO to implement 4-wire (send and
 receive) i2s.  PIO also implements all needed clocks using side sets.
 
-It is presented in YouTube videos: https://youtu.be/R24kLI5O0y0
-and https://youtu.be/IiyGa5ss1Dw
+It is presented in YouTube videos:
+       xxxxxx
+       https://youtu.be/R24kLI5O0y0
+       https://youtu.be/IiyGa5ss1Dw
 
 It uses ARM's CMSIS_DSP library.
 
@@ -84,7 +86,8 @@ dsp_hilbert_fir.c is a time-domain FIR-based Hilbert transform.
 Hilbert transforms create an output that is 90 degrees phased shifted
 from the input (which may need a delay to align).  It is a kind of
 all-pass filter.  Script gen_hilbert_fir.py generates coefficients
-based on the desired number of taps.
+based on the desired number of taps.  Also look for a conditional
+compilation option to output the envelope of a signal.
 
 dsp_hilbert_fir_fft.c is a frequency-domain FIR-based Hilbert
 transform.  It uses FFT convolution to increase efficieny with large
