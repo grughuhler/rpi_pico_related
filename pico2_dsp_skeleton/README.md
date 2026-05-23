@@ -5,9 +5,10 @@ This program is a real-time Audio DSP framework built using the RP2350
 receive) i2s.  PIO also implements all needed clocks using side sets.
 
 It is presented in YouTube videos:
-       xxxxxx
-       https://youtu.be/R24kLI5O0y0
-       https://youtu.be/IiyGa5ss1Dw
+
+    https://youtu.be/QbNZK_LIe-Y   [Hilbert transform]
+    https://youtu.be/R24kLI5O0y0   [Applications]
+    https://youtu.be/IiyGa5ss1Dw   [Framework]
 
 It uses ARM's CMSIS_DSP library.
 
